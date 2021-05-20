@@ -26,4 +26,5 @@ export interface RegistryConfig {
     slave: number,
     address: number,
     type?: "coil" | "holding" | "input"
+    count?: number
 }

@@ -1,18 +1,24 @@
 import mqtt, { MqttClient } from "mqtt";
 import consola from "consola";
-import yaml from "yaml";
-import fs from "fs";
 import Device from "./device";
 import { createMqttClient } from "./mqtt";
 import { ConfigDict, DeviceConfig, GatewayConfig, MqttConfig } from "./types/config";
+import { createModbusConnection, ModbusMaster } from "./modbus";
 
 const devices: Device[] = [];
 let availableDevices: string[] = [];
 
-function LoadDevices(domain: string, client: MqttClient, deviceConf: ConfigDict<DeviceConfig>, devices: Device[]) {
+function LoadDevices(domain: string, client: MqttClient, modbusConnetions: ModbusMaster[], deviceConf: ConfigDict<DeviceConfig>, devices: Device[]) {
     Reflect.ownKeys(deviceConf).forEach(deviceName => {
         const conf = deviceConf[<string>deviceName] || {};
-        devices.push(new Device(<string>deviceName, domain, conf, client))
+        const modbusMaster = modbusConnetions.find(m => m.name === conf.bus)
+
+        if (modbusMaster == null) {
+            consola.error(`Unknown modbus connection with name '${conf.bus}' for device '${<string>deviceName}'`);
+            return;
+        }
+        
+        devices.push(new Device(<string>deviceName, domain, conf, client, modbusMaster))
     });
 }
 
@@ -21,8 +27,10 @@ function checkDevicesAvailability() {
         if (device.available && !availableDevices.includes(device.name)) {
             availableDevices.push(device.name)
             device.sendAvailability()
+            consola.withScope(device.name).info(`Presence: Device '${device.name}' is now ONLINE`)
         } else if (!device.available && availableDevices.includes(device.name)) {
             availableDevices = availableDevices.filter(dn => dn != device.name)
+            consola.withScope(device.name).info(`Presence: Device '${device.name}' is now OFFLINE`)
             device.sendAvailability()
         }
     }
@@ -33,8 +41,19 @@ function introduceDevice(device: Device) {
         availableDevices.push(device.name)
     }
 
+    consola.withScope(device.name)
+        .info(`Presence: Device '${device.name}' is ${device.available ? "ONLINE" : "OFFLINE"}`)
     device.sendAvailability()
     device.sendState()
+}
+
+async function createModbusConnections(config: ConfigDict<string>) {
+    const promises: Promise<ModbusMaster>[] = []
+    for (let port of Reflect.ownKeys(config)) {
+        promises.push(createModbusConnection(<string>port, config[<string>port], 9600))
+    }
+
+    return await Promise.all(promises);
 }
 
 export function createDefaultConfig(): GatewayConfig {
@@ -47,15 +66,17 @@ export function createDefaultConfig(): GatewayConfig {
     }
 }
 
-export default function startGateway(config: GatewayConfig): void {
+export default async function startGateway(config: GatewayConfig): Promise<void> {
     const _topic = (...args: string[]) => `${config.domain}/${args.join("/")}`;
     const domain = config.domain || "modbus-gw"
+
+    const modbusConnections = await createModbusConnections(config.modbus)
     const client = createMqttClient(
         domain,
         config.mqtt.brokerUrl,
         config.mqtt.options || {}
     )
-
+    
     client.on("connect", function () {
         const serverUrl = (client.options as any).href
         consola.success(`Connected to MQTT broker: ${serverUrl} (clientId: ${client.options.clientId})`);
@@ -80,7 +101,7 @@ export default function startGateway(config: GatewayConfig): void {
         if (topic === "hello") {
             client.publish(_topic("available"), "online")
             devices.forEach(introduceDevice)
-            consola.info("Introduction sent on hello packet")
+            consola.success("Introduction sent on hello packet")
         }
 
         if (topic === _topic("command")) {
@@ -92,7 +113,7 @@ export default function startGateway(config: GatewayConfig): void {
         }
     });
 
-    LoadDevices(domain, client, config.devices, devices);
+    LoadDevices(domain, client, modbusConnections, config.devices, devices);
     consola.success(`Initialized ${devices.length} devices`);
 
     // Devices availability heartbeat

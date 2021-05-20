@@ -3,15 +3,19 @@ import Peripheral from "./peripheral";
 import { equal } from "fast-shallow-equal";
 import consola from "consola";
 import { DeviceConfig } from "./types/config";
+import ModbusRTU from "modbus-serial";
+import setQueuedInterval, { sleep } from "./utils/interval";
+import { ModbusMaster } from "./modbus";
 
 export default class Device {
     name: string;
     domain: string;
     mqtt: MqttClient;
-    modbus: null;
+    modbus: ModbusMaster;
     peripherals: Peripheral[];
     state: {};
     _available: boolean;
+    _error: boolean;
 
     /**
      * 
@@ -20,14 +24,15 @@ export default class Device {
      * @param {object} config 
      * @param {MqttClient} mqtt 
      */
-    constructor(name: string, domain: string, config: DeviceConfig, mqtt: MqttClient) {
+    constructor(name: string, domain: string, config: DeviceConfig, mqtt: MqttClient, modbus: ModbusMaster) {
         this.name = name;
         this.domain = domain
         this.mqtt = mqtt
-        this.modbus = null
+        this.modbus = modbus
         this.peripherals = []
         this.state = {}
         this._available = false
+        this._error = false
 
         this._init(config)
         this.mqtt.on("connect", this.onConnect.bind(this))
@@ -44,13 +49,14 @@ export default class Device {
      */
     _init(config: DeviceConfig) {
         const initState: any = {}
-        const checkInterval = config.checkInterval != null 
-            ? config.checkInterval 
+        const checkInterval = config.checkInterval != null
+            ? config.checkInterval
             : 1000
 
         for (let register of Reflect.ownKeys(config.registers)) {
-            const { slave, address, access } = config.registers[<string>register];
-            const peripheral = new Peripheral(this.modbus, <string>register, slave, address, access)
+            const { slave, address, access, count } = config.registers[<string>register];
+            console.log(config.registers[<string>register])
+            const peripheral = new Peripheral(this, this.modbus, <string>register, slave, address, access, count)
 
             if (peripheral.readable) {
                 initState[peripheral.name] = peripheral.getCurrentValue()
@@ -63,7 +69,7 @@ export default class Device {
         this._available = true
 
         if (checkInterval > 0) {
-            setInterval(
+            setQueuedInterval(
                 this._handleRefresh.bind(this),
                 checkInterval
             )
@@ -73,7 +79,7 @@ export default class Device {
     }
 
     get available() {
-        return this.modbus != null && this._available;
+        return this.modbus != null && this._available && !this._error;
     }
 
     onConnect() {
@@ -103,6 +109,11 @@ export default class Device {
     async _handleUpdate(payload: any) {
         const promises: Promise<void>[] = []
         const newState: any = {}
+
+        if (!this.available) {
+            consola.withScope(this.name).log("Can't update state: Device is unavailable")
+            return
+        }
 
         async function writeToPeripheral(peripheral: Peripheral, value: number) {
             newState[peripheral.name] = await peripheral.write(value)
@@ -155,23 +166,32 @@ export default class Device {
      */
     async refresh(): Promise<boolean> {
         const newState: any = {}
-        const promises: Promise<void>[] = []
 
         async function readFromPeripheral(peripheral: Peripheral) {
             newState[peripheral.name] = await peripheral.read()
+            //await sleep(1)
         }
 
-        for (let peripheral of this.peripherals) {
-            if (!peripheral.readable) {
-                continue;
+        try {
+            this.modbus.free()
+
+            for (let peripheral of this.peripherals) {
+                if (!peripheral.readable) {
+                    continue;
+                }
+
+                consola.withScope(this.name).trace(`refresh ${peripheral.name}`)
+                await readFromPeripheral(peripheral)
             }
 
-            consola.withScope(this.name).trace(`refresh ${peripheral.name}`)
-            promises.push(readFromPeripheral(peripheral))
+        
+            this._error = false
+            return this.update(newState)
+        } catch (err) {
+            consola.withScope(this.name).error(err)
+            this._error = true
+            return false
         }
-
-        await Promise.all(promises)
-        return this.update(newState)
     }
 
     sendState() {

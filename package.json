@@ -8,6 +8,7 @@
     "build": "tsc"
   },
   "dependencies": {
+    "async-mutex": "^0.3.1",
     "consola": "^2.15.3",
     "fast-shallow-equal": "^1.0.0",
     "modbus-serial": "^8.0.1",
