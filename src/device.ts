@@ -2,6 +2,7 @@ import { MqttClient } from "mqtt";
 import Peripheral from "./peripheral";
 import { equal } from "fast-shallow-equal";
 import consola from "consola";
+import { DeviceConfig } from "./types/config";
 
 export default class Device {
     name: string;
@@ -19,7 +20,7 @@ export default class Device {
      * @param {object} config 
      * @param {MqttClient} mqtt 
      */
-    constructor(name: string, domain: string, config: object, mqtt: MqttClient) {
+    constructor(name: string, domain: string, config: DeviceConfig, mqtt: MqttClient) {
         this.name = name;
         this.domain = domain
         this.mqtt = mqtt
@@ -39,16 +40,16 @@ export default class Device {
 
     /**
      * 
-     * @param {object} config 
+     * @param {DeviceConfig} config 
      */
-    _init(config: any) {
+    _init(config: DeviceConfig) {
         const initState: any = {}
-        const checkInterval = config.check_interval != null 
-            ? config.check_interval 
+        const checkInterval = config.checkInterval != null 
+            ? config.checkInterval 
             : 1000
 
         for (let register of Reflect.ownKeys(config.registers)) {
-            const { slave, address, access } = config.registers[register];
+            const { slave, address, access } = config.registers[<string>register];
             const peripheral = new Peripheral(this.modbus, <string>register, slave, address, access)
 
             if (peripheral.readable) {

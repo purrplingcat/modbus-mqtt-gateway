@@ -1,7 +1,8 @@
 import consola from "consola";
 import yaml from "yaml"
 import fs from "fs"
-import startGateway from "./gateway";
+import startGateway, { createDefaultConfig } from "./gateway";
+import { GatewayConfig } from "./types/config";
 
 export function errorHandler(err: Error) {
     consola.fatal(err);
@@ -11,7 +12,10 @@ export function errorHandler(err: Error) {
 export default function run(argv: string[], env: NodeJS.ProcessEnv) {
     consola.info("Parsing configuration file ...")
     const configFile = argv[1] || env.MODBUS_MQTT_GW_CONFIG || "config/config.yaml"
-    const config = yaml.parse(fs.readFileSync(configFile).toString())
+    const config: GatewayConfig = Object.assign(
+        createDefaultConfig(), 
+        yaml.parse(fs.readFileSync(configFile).toString())
+    )
 
     startGateway(config);
 }

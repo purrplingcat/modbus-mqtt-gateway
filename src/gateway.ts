@@ -3,14 +3,15 @@ import consola from "consola";
 import yaml from "yaml";
 import fs from "fs";
 import Device from "./device";
+import { createMqttClient } from "./mqtt";
+import { ConfigDict, DeviceConfig, GatewayConfig, MqttConfig } from "./types/config";
 
-const instanceId = Math.random().toString(16).substr(2, 8)
 const devices: Device[] = [];
 let availableDevices: string[] = [];
 
-function LoadDevices(domain: string, client: MqttClient, deviceConf: any, devices: Device[]) {
+function LoadDevices(domain: string, client: MqttClient, deviceConf: ConfigDict<DeviceConfig>, devices: Device[]) {
     Reflect.ownKeys(deviceConf).forEach(deviceName => {
-        const conf = deviceConf[deviceName] || {};
+        const conf = deviceConf[<string>deviceName] || {};
         devices.push(new Device(<string>deviceName, domain, conf, client))
     });
 }
@@ -36,15 +37,24 @@ function introduceDevice(device: Device) {
     device.sendState()
 }
 
-export default function startGateway(config: any) {
-    consola.info(`Connecting to MQTT broker: ${config.mqtt.brokerUrl} ...`)
-    const mqttClientOpts = (config.mqtt || {}).options || {}
-    const domain = config.domain || "modbus-gw";
-    const _topic = (...args: string[]) => `${domain}/${args.join("/")}`;
-    const client = mqtt.connect(config.mqtt.brokerUrl, {
-        clientId: domain + "#" + instanceId,
-        will: { topic: "bye", payload: domain, qos: 0, retain: false }
-    });
+export function createDefaultConfig(): GatewayConfig {
+    return {
+        domain: "modbus-gw",
+        devices: {},
+        modbus: {},
+        mqtt: { brokerUrl: "" },
+        deviceAvailabilityHeartbeat: 500
+    }
+}
+
+export default function startGateway(config: GatewayConfig): void {
+    const _topic = (...args: string[]) => `${config.domain}/${args.join("/")}`;
+    const domain = config.domain || "modbus-gw"
+    const client = createMqttClient(
+        domain,
+        config.mqtt.brokerUrl,
+        config.mqtt.options || {}
+    )
 
     client.on("connect", function () {
         const serverUrl = (client.options as any).href
@@ -86,5 +96,5 @@ export default function startGateway(config: any) {
     consola.success(`Initialized ${devices.length} devices`);
 
     // Devices availability heartbeat
-    setInterval(checkDevicesAvailability, config.device_availability_heartbeat || 500)
+    setInterval(checkDevicesAvailability, config.deviceAvailabilityHeartbeat || 500)
 }
