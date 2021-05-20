@@ -1,9 +1,17 @@
-const { MqttClient } = require("mqtt");
-const Peripheral = require("./peripheral");
-const { equal } = require("fast-shallow-equal");
-const consola = require("consola");
+import { MqttClient } from "mqtt";
+import Peripheral from "./peripheral";
+import { equal } from "fast-shallow-equal";
+import consola from "consola";
 
-class Device {
+export default class Device {
+    name: string;
+    domain: string;
+    mqtt: MqttClient;
+    modbus: null;
+    peripherals: Peripheral[];
+    state: {};
+    _available: boolean;
+
     /**
      * 
      * @param {string} name 
@@ -11,7 +19,7 @@ class Device {
      * @param {object} config 
      * @param {MqttClient} mqtt 
      */
-    constructor(name, domain, config, mqtt) {
+    constructor(name: string, domain: string, config: object, mqtt: MqttClient) {
         this.name = name;
         this.domain = domain
         this.mqtt = mqtt
@@ -25,7 +33,7 @@ class Device {
         this.mqtt.on("message", this.onMessage.bind(this))
     }
 
-    _topic(...args) {
+    _topic(...args: string[]) {
         return `${this.domain}.${this.name}/${args.join("/")}`
     }
 
@@ -33,15 +41,15 @@ class Device {
      * 
      * @param {object} config 
      */
-    _init(config) {
-        const initState = {}
+    _init(config: any) {
+        const initState: any = {}
         const checkInterval = config.check_interval != null 
             ? config.check_interval 
             : 1000
 
         for (let register of Reflect.ownKeys(config.registers)) {
             const { slave, address, access } = config.registers[register];
-            const peripheral = new Peripheral(this.modbus, register, slave, address, access)
+            const peripheral = new Peripheral(this.modbus, <string>register, slave, address, access)
 
             if (peripheral.readable) {
                 initState[peripheral.name] = peripheral.getCurrentValue()
@@ -71,7 +79,7 @@ class Device {
         this.mqtt.subscribe(this._topic("command"), (e, g) => consola.debug(g))
     }
 
-    onMessage(topic, message) {
+    onMessage(topic: string, message: string) {
         if (topic === this._topic("command")) {
             const command = JSON.parse(message) || {};
 
@@ -79,7 +87,7 @@ class Device {
         }
     }
 
-    async handleCommand(command, payload) {
+    async handleCommand(command: string, payload: any) {
         consola.withScope(this.name).debug(`Received command: ${command}`, payload)
         switch (command) {
             case "update":
@@ -91,11 +99,11 @@ class Device {
         }
     }
 
-    async _handleUpdate(payload) {
-        const promises = []
-        const newState = {}
+    async _handleUpdate(payload: any) {
+        const promises: Promise<void>[] = []
+        const newState: any = {}
 
-        async function writeToPeripheral(peripheral, value) {
+        async function writeToPeripheral(peripheral: Peripheral, value: number) {
             newState[peripheral.name] = await peripheral.write(value)
         }
 
@@ -126,7 +134,7 @@ class Device {
      * @param {object} newState 
      * @returns {boolean}
      */
-    update(partialState) {
+    update(partialState: any): boolean {
         const prevState = this.state;
         const newState = { ...prevState, ...partialState }
 
@@ -144,11 +152,11 @@ class Device {
      * 
      * @returns {Promise<boolean>}
      */
-    async refresh() {
-        const newState = {}
-        const promises = []
+    async refresh(): Promise<boolean> {
+        const newState: any = {}
+        const promises: Promise<void>[] = []
 
-        async function readFromPeripheral(peripheral) {
+        async function readFromPeripheral(peripheral: Peripheral) {
             newState[peripheral.name] = await peripheral.read()
         }
 
@@ -177,5 +185,3 @@ class Device {
         }
     }
 }
-
-module.exports = Device;
