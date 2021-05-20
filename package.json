@@ -1,0 +1,15 @@
+{
+  "name": "modbus-gateway",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "node gateway.js"
+  },
+  "dependencies": {
+    "consola": "^2.15.3",
+    "fast-shallow-equal": "^1.0.0",
+    "mqtt": "^4.2.6",
+    "yaml": "^1.10.2"
+  }
+}

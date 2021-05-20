@@ -1,0 +1,45 @@
+domain: modbus-gw
+mqtt:
+  brokerUrl: mqtt://127.0.0.1
+modbus:
+  main: /dev/tty223
+devices:
+  kitchen_light: # Světlo v kuchyni
+    bus: main
+    check_interval: 250
+    registers:
+      switch: # Vypínač
+        access: RW
+        slave: 1
+        address: 1
+      current: # Měřič proudu světla
+        access: R
+        slave: 1
+        address: 0
+      brightness: # Jas
+        access: RW
+        slave: 2
+        address: 1
+      color_temp: # Teplota
+        access: RW
+        slave: 2
+        address: 2
+  bathroom_light: # Světlo v koupelně
+    bus: main
+    registers:
+      switch: # Vypínač
+        access: RW
+        slave: 3
+        address: 1
+      current: # Měřič proudu světla
+        access: R
+        slave: 3
+        address: 0
+      brightness: # Jas
+        access: RW
+        slave: 4
+        address: 1
+      color_temp: # Teplota
+        access: RW
+        slave: 4
+        address: 2
