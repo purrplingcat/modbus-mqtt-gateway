@@ -99,7 +99,7 @@ export default async function startGateway(config: GatewayConfig): Promise<void>
         }
 
         if (topic === "hello") {
-            client.publish(_topic("available"), "online")
+            client.publish(_topic("presence"), "online")
             devices.forEach(introduceDevice)
             consola.success("Introduction sent on hello packet")
         }

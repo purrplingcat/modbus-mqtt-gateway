@@ -15,7 +15,7 @@ export default class Device {
     peripherals: Peripheral[];
     state: {};
     _available: boolean;
-    _error: boolean;
+    _error: Error | null;
 
     /**
      * 
@@ -32,7 +32,7 @@ export default class Device {
         this.peripherals = []
         this.state = {}
         this._available = false
-        this._error = false
+        this._error = null
 
         this._init(config)
         this.mqtt.on("connect", this.onConnect.bind(this))
@@ -69,7 +69,7 @@ export default class Device {
 
         if (checkInterval > 0) {
             setQueuedInterval(
-                this._handleRefresh.bind(this),
+                this._handleRefresh.bind(this, 10),
                 checkInterval
             )
         }
@@ -78,7 +78,7 @@ export default class Device {
     }
 
     get available() {
-        return this.modbus != null && this._available && !this._error;
+        return this.modbus.connected && this._available && !this._error;
     }
 
     onConnect() {
@@ -92,7 +92,7 @@ export default class Device {
 
             this.handleCommand(command.name || "", command.payload || {})
         }
-        
+
         if (topic === this._topic("set")) {
             // shortcut to command "update" via dedicated topic "set"
             // (this is for better compatibility with some home assistants)
@@ -109,7 +109,7 @@ export default class Device {
                 this._handleUpdate(payload)
                 break
             case "refresh":
-                this._handleRefresh()
+                this._handleRefresh(0)
                 break
         }
     }
@@ -120,6 +120,7 @@ export default class Device {
 
         if (!this.available) {
             consola.withScope(this.name).log("Can't update state: Device is unavailable")
+            this.sendAvailability()
             return
         }
 
@@ -137,16 +138,20 @@ export default class Device {
             }
 
             await Promise.all(promises)
+            this.resetError()
+
             if (this.update(newState)) {
                 this.sendState()
             }
         } catch (err) {
+            this.error(err)
+            this.sendAvailability()
             consola.withScope(this.name).error(err)
         }
     }
 
-    async _handleRefresh() {
-        const updated = await this.refresh()
+    async _handleRefresh(queuePriority: number) {
+        const updated = await this.refresh(queuePriority)
 
         if (updated) {
             this.sendState()
@@ -178,12 +183,15 @@ export default class Device {
      * 
      * @returns {Promise<boolean>}
      */
-    async refresh(): Promise<boolean> {
+    async refresh(queuePriority = 0): Promise<boolean> {
         const newState: any = {}
 
+        if (!this.modbus.connected) {
+            return false
+        }
+
         async function readFromPeripheral(peripheral: Peripheral) {
-            newState[peripheral.name] = await peripheral.read()
-            //await sleep(1)
+            newState[peripheral.name] = await peripheral.read(queuePriority)
         }
 
         try {
@@ -196,12 +204,14 @@ export default class Device {
                 await readFromPeripheral(peripheral)
             }
 
+            this.resetError()
 
-            this._error = false
             return this.update(newState)
         } catch (err) {
+            this.error(err)
+            this.sendAvailability()
             consola.withScope(this.name).error(err)
-            this._error = true
+
             return false
         }
     }
@@ -214,7 +224,27 @@ export default class Device {
 
     sendAvailability() {
         if (this.mqtt.connected && !this.mqtt.disconnecting) {
-            this.mqtt.publish(this._topic("available"), this.available ? "online" : "offline")
+            this.mqtt.publish(this._topic("presence"), this.available ? "online" : "offline")
+        }
+    }
+
+    error(err: Error) {
+        this._error = err;
+
+        if (this.mqtt.connected && !this.mqtt.disconnecting) {
+            this.mqtt.publish(this._topic("err"), this._error.message)
+        }
+    }
+
+    resetError() {
+        if (this._error == null) {
+            return;
+        }
+
+        this._error = null
+
+        if (this.mqtt.connected && !this.mqtt.disconnecting) {
+            this.mqtt.publish(this._topic("err"), "")
         }
     }
 }
