@@ -119,17 +119,21 @@ export default class Device {
             newState[peripheral.name] = await peripheral.write(value)
         }
 
-        for (let key of Reflect.ownKeys(payload)) {
-            const peripheral = this.peripherals.find(p => p.name === key)
+        try {
+            for (let key of Reflect.ownKeys(payload)) {
+                const peripheral = this.peripherals.find(p => p.name === key)
 
-            if (peripheral && peripheral.writable) {
-                promises.push(writeToPeripheral(peripheral, payload[key]))
+                if (peripheral && peripheral.writable) {
+                    promises.push(writeToPeripheral(peripheral, payload[key]))
+                }
             }
-        }
 
-        await Promise.all(promises)
-        if (this.update(newState)) {
-            this.sendState()
+            await Promise.all(promises)
+            if (this.update(newState)) {
+                this.sendState()
+            }
+        } catch (err) {
+            consola.withScope(this.name).error(err)
         }
     }
 
@@ -173,8 +177,6 @@ export default class Device {
         }
 
         try {
-            this.modbus.free()
-
             for (let peripheral of this.peripherals) {
                 if (!peripheral.readable) {
                     continue;
@@ -184,7 +186,7 @@ export default class Device {
                 await readFromPeripheral(peripheral)
             }
 
-        
+
             this._error = false
             return this.update(newState)
         } catch (err) {

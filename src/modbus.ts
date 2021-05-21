@@ -10,54 +10,33 @@ export class ModbusMaster {
     modbus: ModbusRTU;
     private _semaphore: Semaphore
     private _logger: Consola
-    private _preloaded: Dict<number[]>
 
     constructor(name: string, modbus: ModbusRTU) {
         this.name = name;
         this.modbus = modbus;
         this._semaphore = new Semaphore(1)
         this._logger = consola.withScope(`modbus:${name}`);
-        this._preloaded = {}
     }
 
-    async _readRegisterBuffer(slave: number, start: number, length: number) {
-        const cacheKey = `${slave}.${start}.${length}`;
-
-        console.log(cacheKey)
-
-        if (Reflect.has(this._preloaded, cacheKey)) {
-            this._logger.log("Using preloaded cache for slave " + slave)
-            return this._preloaded[cacheKey];
-        }
-
-        const result = await this.modbus.readHoldingRegisters(start, length)
-        this._preloaded[cacheKey] = result.data;
-        this._logger.log(`Fetched fresh data from ${slave} and stored in preloaded cache`)
-
-        return result.data;
-    }
-
-    async readRegister(slave: number, address: number, count: number, processor?: (v: ReadRegisterResult) => number) {
+    async readRegister(slave: number, address: number) {
         return await this._semaphore.runExclusive(async () => {
-            if (processor == null) {
-                processor = (v) => v.data.reduce((acc, curr) => acc + curr, 0)
-            }
-
+            this._logger.debug(`Start reading registry ${address} from slave ${slave}`)
             this.modbus.setID(slave)
-            this._logger.log(`Start reading registry ${address} from slave ${slave}`)
-            const result = await this.modbus.readHoldingRegisters(address, count)
-            this._logger.log(`Registry ${address} from slave ${slave} read`)
-            this._logger.log(result)
+            const result = await this.modbus.readHoldingRegisters(address, 2) // TODO: change to 1 when Ashley fix reading in device
+            this._logger.debug(`Registry ${address} from slave ${slave} read`)
+            this._logger.trace(result)
 
-            console.log(processor(result))
-
-            return processor(result)
+            return result.data[0]
         });
     }
 
-    free() {
-        this._preloaded = {}
-        this._logger.log("Preloaded cache clear")
+    async writeRegister(slave: number, address: number, value: number) {
+        return await this._semaphore.runExclusive(async () => {
+            this._logger.log(`Start writing registry ${address} to slave ${slave}, value: ${value}`)
+            this.modbus.setID(slave)
+            await this.modbus.writeRegister(address, value)
+            this._logger.log(`Value ${value} written in registry ${address} in slave ${slave}`)
+        })
     }
 }
 

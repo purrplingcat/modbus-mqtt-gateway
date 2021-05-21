@@ -12,12 +12,10 @@ devices:
         access: RW
         slave: 255
         address: 1
-        count: 2
       current: # Měřič proudu světla
         access: R
         slave: 255
         address: 0
-        count: 2
       #brightness: # Jas
       #  access: RW
       #  slave: 2
@@ -33,7 +31,6 @@ devices:
         access: RW
         slave: 255
         address: 1
-        count: 2
   #    current: # Měřič proudu světla
   #      access: R
   #      slave: 3
