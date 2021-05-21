@@ -95,10 +95,13 @@ export default async function startGateway(config: GatewayConfig): Promise<void>
     
     client.on("connect", function () {
         const serverUrl = (client.options as any).href
+        const introdceOn = config.mqtt.introduction || {}
         consola.success(`Connected to MQTT broker: ${serverUrl} (clientId: ${client.options.clientId})`);
 
-        client.subscribe(["hello", "bye", _topic("command")])
-        client.publish("hello", domain);
+        client.subscribe([...Object.keys(introdceOn), _topic("command")])
+        client.publish(_topic("presence"), "online")
+        devices.forEach(introduceDevice)
+        consola.success("Introduction sent")
     });
 
     client.on("offline", function () {
@@ -114,12 +117,6 @@ export default async function startGateway(config: GatewayConfig): Promise<void>
             return;
         }
 
-        if (topic === "hello") {
-            client.publish(_topic("presence"), "online")
-            devices.forEach(introduceDevice)
-            consola.success("Introduction sent on hello packet")
-        }
-
         if (topic === _topic("command")) {
             const command = JSON.parse(message.toString()) || {}
 
@@ -127,6 +124,8 @@ export default async function startGateway(config: GatewayConfig): Promise<void>
                 devices.forEach(d => d.sendState())
             }
         }
+
+        handleIntroduction(config, topic, message, client, _topic);
     });
 
     LoadDevices(domain, client, modbusConnections, config.devices, devices);
@@ -134,4 +133,16 @@ export default async function startGateway(config: GatewayConfig): Promise<void>
 
     // Devices availability heartbeat
     setInterval(checkDevicesAvailability, config.deviceAvailabilityHeartbeat || 500)
+}
+
+function handleIntroduction(config: GatewayConfig, topic: string, message: Buffer, client: MqttClient, _topic: (...args: string[]) => string) {
+    const introduceOn = config.mqtt.introduction || {};
+    const introTrigMsg = introduceOn[topic];
+    const isIntro = introTrigMsg === "*" || introTrigMsg === message.toString();
+
+    if (Reflect.has(introduceOn, topic) && isIntro) {
+        client.publish(_topic("presence"), "online");
+        devices.forEach(introduceDevice);
+        consola.success("Introduction sent");
+    }
 }

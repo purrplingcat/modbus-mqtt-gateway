@@ -26,10 +26,10 @@ export class ModbusMaster {
         return await this._semaphore.runExclusive(async () => {
             this._logger.trace(`Start reading registry ${address} from slave ${slave}`)
             this.modbus.setID(slave)
-            const result = await this.modbus.readHoldingRegisters(0, 2) // TODO: change to (address, 1) when Ashley fixes reading in device
+            const result = await this.modbus.readHoldingRegisters(address, 1)
             this._logger.trace(`Registry ${address} from slave ${slave} read`, result)
 
-            return result.data[address] // TODO: change key to 0 when Ashley fixes reading in device
+            return result.data[0] // TODO: change key to 0 when Ashley fixes reading in device
         }, priority);
     }
 

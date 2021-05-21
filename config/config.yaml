@@ -1,6 +1,8 @@
 domain: modbus/gw0
 mqtt:
   brokerUrl: mqtt://127.0.0.1
+  introduction:
+    senses/presence: online
 modbus:
   main: 
     type: serial

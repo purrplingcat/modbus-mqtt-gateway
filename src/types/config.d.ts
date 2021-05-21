@@ -13,6 +13,7 @@ export interface GatewayConfig {
 
 export interface MqttConfig {
     brokerUrl: string,
+    introduction?: ConfigDict<string>
     options?: IClientOptions,
 }
 
