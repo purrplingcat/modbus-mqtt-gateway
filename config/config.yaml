@@ -1,4 +1,4 @@
-domain: modbus-gw
+domain: modbus/gw0
 mqtt:
   brokerUrl: mqtt://127.0.0.1
 modbus:
@@ -7,7 +7,7 @@ modbus:
     connectionString: /dev/ttyS4
     baudRate: 9600
 devices:
-  kitchen/light: # Světlo v kuchyni
+  kitchenlight0: # Světlo v kuchyni
     bus: main
     checkInterval: 1000
     registers:
@@ -27,7 +27,7 @@ devices:
       #  access: RW
       #  slave: 2
       #  address: 2
-  bathroom/light: # Světlo v koupelně
+  bathroomlight0: # Světlo v koupelně
     bus: main
     checkInterval: 1000
     registers:
