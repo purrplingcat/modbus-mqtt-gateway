@@ -36,8 +36,9 @@ export default class Peripheral {
 
     async read(): Promise<number> {
         try {
-            consola.withScope(this.device.name).debug(`modbus read: '${this.name}' ${this.slave}:${this.address}`)
+            consola.withScope(this.device.name).trace(`modbus read: '${this.name}' ${this.slave}:${this.address}`)
             this._value = await this.modbus.readRegister(this.slave, this.address)
+            consola.withScope(this.device.name).debug(`SUCCESS modbus read: '${this.name}' ${this.slave}:${this.address}`)
 
             return this._value;
         } catch (err) {
@@ -47,8 +48,9 @@ export default class Peripheral {
 
     async write(value: number): Promise<number> {
         try {
-            consola.withScope(this.device.name).log(`modbus write: '${this.name}' ${this.slave}:${this.address}`)
+            consola.withScope(this.device.name).trace(`modbus write: '${this.name}' ${this.slave}:${this.address}`)
             await this.modbus.writeRegister(this.slave, this.address, Number(value))
+            consola.withScope(this.device.name).debug(`SUCCESS modbus writen: '${this.name}' ${this.slave}:${this.address}`)
 
             return this._value = Number(value);
         } catch (err) {

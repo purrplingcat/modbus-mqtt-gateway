@@ -26,8 +26,21 @@ devices:
       #  address: 2
   bathroom_light: # Světlo v koupelně
     bus: main
+    checkInterval: 1000
     registers:
       switch: # Vypínač
+        access: RW
+        slave: 255
+        address: 1
+      switch1: # Vypínač
+        access: RW
+        slave: 255
+        address: 1
+      switch2: # Vypínač
+        access: RW
+        slave: 255
+        address: 1
+      switch3: # Vypínač
         access: RW
         slave: 255
         address: 1

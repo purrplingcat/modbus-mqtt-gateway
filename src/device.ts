@@ -55,7 +55,6 @@ export default class Device {
 
         for (let register of Reflect.ownKeys(config.registers)) {
             const { slave, address, access, count } = config.registers[<string>register];
-            console.log(config.registers[<string>register])
             const peripheral = new Peripheral(this, this.modbus, <string>register, slave, address, access, count)
 
             if (peripheral.readable) {
@@ -160,6 +159,8 @@ export default class Device {
 
         newState._updatedAt = new Date()
         this.state = newState;
+        consola.withScope(this.name).debug(`State updated: ${this.name} at ${newState._updatedAt}`),
+        consola.withScope(this.name).trace(`Changes payload: `, partialState)
 
         return true
     }
@@ -182,7 +183,7 @@ export default class Device {
                     continue;
                 }
 
-                consola.withScope(this.name).trace(`refresh ${peripheral.name}`)
+                consola.withScope(this.name).debug(`refresh ${peripheral.name} on device ${this.name}`)
                 await readFromPeripheral(peripheral)
             }
 
