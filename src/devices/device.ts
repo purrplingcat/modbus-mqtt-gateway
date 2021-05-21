@@ -2,10 +2,9 @@ import { MqttClient } from "mqtt";
 import Peripheral from "./peripheral";
 import { equal } from "fast-shallow-equal";
 import consola from "consola";
-import { DeviceConfig } from "./types/config";
-import ModbusRTU from "modbus-serial";
-import setQueuedInterval, { sleep } from "./utils/interval";
-import { ModbusMaster } from "./modbus";
+import { DeviceConfig } from "../types/config";
+import setQueuedInterval, { sleep } from "../utils/interval";
+import { ModbusMaster } from "../exchange/modbus";
 
 export default class Device {
     name: string;

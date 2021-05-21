@@ -6,17 +6,17 @@
  * My edit adds support for priorities in queue
  */
 
-interface SemaphoreInterface {
-    acquire(priority: number): Promise<[number, SemaphoreInterface.Releaser]>;
+interface ISemaphore {
+    acquire(priority: number): Promise<[number, ISemaphore.Releaser]>;
 
-    runExclusive<T>(callback: SemaphoreInterface.Worker<T>, priority: number): Promise<T>;
+    runExclusive<T>(callback: ISemaphore.Worker<T>, priority: number): Promise<T>;
 
     isLocked(): boolean;
 
     cancel(): void;
 }
 
-namespace SemaphoreInterface {
+namespace ISemaphore {
     export interface Releaser {
         (): void;
     }
@@ -26,4 +26,4 @@ namespace SemaphoreInterface {
     }
 }
 
-export default SemaphoreInterface;
+export default ISemaphore;

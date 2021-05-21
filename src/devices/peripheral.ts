@@ -1,7 +1,6 @@
 import consola from "consola"
-import ModbusRTU from "modbus-serial"
 import Device from "./device"
-import { ModbusMaster } from "./modbus"
+import { ModbusMaster } from "../exchange/modbus"
 
 export default class Peripheral {
     device: Device

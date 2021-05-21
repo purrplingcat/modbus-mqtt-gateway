@@ -1,9 +1,9 @@
-import mqtt, { MqttClient } from "mqtt";
+import { MqttClient } from "mqtt";
 import consola from "consola";
-import Device from "./device";
-import { createMqttClient } from "./mqtt";
+import Device from "./devices/device";
+import { createMqttClient } from "./exchange/mqtt";
 import { ConfigDict, DeviceConfig, GatewayConfig, MqttConfig } from "./types/config";
-import { createModbusConnection, ModbusMaster } from "./modbus";
+import { createModbusConnection, ModbusMaster } from "./exchange/modbus";
 
 const devices: Device[] = [];
 let availableDevices: string[] = [];

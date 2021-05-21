@@ -6,13 +6,13 @@
  * My edit adds support for priorities in queue
  */
 
-import SemaphoreInterface from "./semaphore-interface";
+import ISemaphore from "./ISemaphore";
 
 export const E_CANCELED = new Error("Request for lock canceled");
 
 interface QueueEntry {
     priority: number;
-    resolve: (ticket: [number, SemaphoreInterface.Releaser]) => void;
+    resolve: (ticket: [number, ISemaphore.Releaser]) => void;
     reject: (err: Error) => void;
 }
 
@@ -24,7 +24,7 @@ function byPriority(a: QueueEntry, b: QueueEntry) {
     return a.priority > b.priority ? 1 : -1;
 }
 
-export default class Semaphore {
+export default class Semaphore implements ISemaphore {
     constructor(private _maxConcurrency: number, private _cancelError: Error = E_CANCELED) {
         if (_maxConcurrency <= 0) {
             throw new Error("Semaphore must be initialized to a positive value");
@@ -33,9 +33,9 @@ export default class Semaphore {
         this._value = _maxConcurrency;
     }
 
-    acquire(priority = 0): Promise<[number, SemaphoreInterface.Releaser]> {
+    acquire(priority = 0): Promise<[number, ISemaphore.Releaser]> {
         const locked = this.isLocked();
-        const ticketPromise = new Promise<[number, SemaphoreInterface.Releaser]>((resolve, reject) => {
+        const ticketPromise = new Promise<[number, ISemaphore.Releaser]>((resolve, reject) => {
             this._queue.push({ priority, resolve, reject })
             this._queue.sort(byPriority)
         });
@@ -45,7 +45,7 @@ export default class Semaphore {
         return ticketPromise;
     }
 
-    async runExclusive<T>(callback: SemaphoreInterface.Worker<T>, priority = 0): Promise<T> {
+    async runExclusive<T>(callback: ISemaphore.Worker<T>, priority = 0): Promise<T> {
         const [value, release] = await this.acquire(priority);
 
         try {
@@ -83,6 +83,6 @@ export default class Semaphore {
     }
 
     private _queue: Array<QueueEntry> = [];
-    private _currentReleaser: SemaphoreInterface.Releaser | undefined;
+    private _currentReleaser: ISemaphore.Releaser | undefined;
     private _value: number;
 }

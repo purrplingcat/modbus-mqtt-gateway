@@ -1,7 +1,7 @@
 import consola, { Consola } from "consola"
 import ModbusRTU from "modbus-serial"
 import { ReadRegisterResult } from "modbus-serial/ModbusRTU";
-import Semaphore from "./mutex/semaphore";
+import Semaphore from "../mutex/Semaphore";
 
 type Dict<V> = { [key: string]: V };
 
