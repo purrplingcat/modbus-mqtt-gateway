@@ -83,6 +83,7 @@ export default class Device {
 
     onConnect() {
         this.mqtt.subscribe(this._topic("command"), (e, g) => consola.debug(g))
+        this.mqtt.subscribe(this._topic("set"), (e, g) => consola.debug(g))
     }
 
     onMessage(topic: string, message: string) {
@@ -90,6 +91,14 @@ export default class Device {
             const command = JSON.parse(message) || {};
 
             this.handleCommand(command.name || "", command.payload || {})
+        }
+        
+        if (topic === this._topic("set")) {
+            // shortcut to command "update" via dedicated topic "set"
+            // (this is for better compatibility with some home assistants)
+            const stateChanges = JSON.parse(message) || {};
+
+            this.handleCommand("update", stateChanges)
         }
     }
 
