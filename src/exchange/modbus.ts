@@ -1,6 +1,6 @@
 import consola, { Consola } from "consola"
 import ModbusRTU from "modbus-serial"
-import { ReadRegisterResult } from "modbus-serial/ModbusRTU";
+import { ReadRegisterResult, SerialPortOptions } from "modbus-serial/ModbusRTU";
 import Semaphore from "../mutex/Semaphore";
 
 type Dict<V> = { [key: string]: V };
@@ -43,12 +43,12 @@ export class ModbusMaster {
     }
 }
 
-export async function createModbusConnection(name: string, device: string, baudRate: number) {
+export async function createSerialModbusConnection(name: string, device: string, baudRate: number, options?: SerialPortOptions) {
     const modbusClient = new ModbusRTU()
 
     try {
         consola.info(`Opening modbus connection '${name}' on serial port ${device} (${baudRate} bauds) ...`)
-        await modbusClient.connectRTUBuffered(device, { baudRate, parity: "none" })
+        await modbusClient.connectRTUBuffered(device, { baudRate, parity: "none", ...(options || {}) })
         modbusClient.setTimeout(10000)
     } catch (err) {
         consola.error(`Can't open modbus connection '${name}':  ${err.message} (${err.name})`)

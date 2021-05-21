@@ -17,5 +17,6 @@ export default function run(argv: string[], env: NodeJS.ProcessEnv) {
         yaml.parse(fs.readFileSync(configFile).toString())
     )
 
+    consola.info("Starting gateway ...")
     startGateway(config);
 }

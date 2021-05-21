@@ -2,8 +2,8 @@ import { MqttClient } from "mqtt";
 import consola from "consola";
 import Device from "./devices/device";
 import { createMqttClient } from "./exchange/mqtt";
-import { ConfigDict, DeviceConfig, GatewayConfig, MqttConfig } from "./types/config";
-import { createModbusConnection, ModbusMaster } from "./exchange/modbus";
+import { ConfigDict, DeviceConfig, GatewayConfig, ModbusConfig, MqttConfig } from "./types/config";
+import { createSerialModbusConnection, ModbusMaster } from "./exchange/modbus";
 
 const devices: Device[] = [];
 let availableDevices: string[] = [];
@@ -17,7 +17,7 @@ function LoadDevices(domain: string, client: MqttClient, modbusConnetions: Modbu
             consola.error(`Unknown modbus connection with name '${conf.bus}' for device '${<string>deviceName}'`);
             return;
         }
-        
+
         devices.push(new Device(<string>deviceName, domain, conf, client, modbusMaster))
     });
 }
@@ -47,10 +47,25 @@ function introduceDevice(device: Device) {
     device.sendState()
 }
 
-async function createModbusConnections(config: ConfigDict<string>) {
+async function createModbusConnections(config: ConfigDict<ModbusConfig>) {
     const promises: Promise<ModbusMaster>[] = []
-    for (let port of Reflect.ownKeys(config)) {
-        promises.push(createModbusConnection(<string>port, config[<string>port], 9600))
+    for (let busName of Reflect.ownKeys(config)) {
+        const { type, connectionString, baudRate, options } = config[<string>busName];
+        
+        switch (type) {
+            case "serial":
+                promises.push(
+                    createSerialModbusConnection(
+                        <string>busName,
+                        connectionString,
+                        baudRate || 9600,
+                        options
+                    )
+                )
+                break;
+            default:
+                consola.error(`${<string>busName}: Unknown modbus type '${type}'`)
+        }
     }
 
     return await Promise.all(promises);
@@ -69,6 +84,7 @@ export function createDefaultConfig(): GatewayConfig {
 export default async function startGateway(config: GatewayConfig): Promise<void> {
     const _topic = (...args: string[]) => `${config.domain}/${args.join("/")}`;
     const domain = config.domain || "modbus-gw"
+    consola.info(`Domain: ${domain}`)
 
     const modbusConnections = await createModbusConnections(config.modbus)
     const client = createMqttClient(

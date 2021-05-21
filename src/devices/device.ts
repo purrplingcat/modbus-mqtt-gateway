@@ -39,7 +39,7 @@ export default class Device {
     }
 
     _topic(...args: string[]) {
-        return `${this.domain}.${this.name}/${args.join("/")}`
+        return `${this.domain}/${this.name}/${args.join("/")}`
     }
 
     /**
