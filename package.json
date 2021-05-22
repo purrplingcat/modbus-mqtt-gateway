@@ -1,7 +1,7 @@
 {
   "name": "modbus-gateway",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "lib/app.js",
   "license": "MIT",
   "scripts": {
     "start": "node lib/gateway.js",

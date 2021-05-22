@@ -1,10 +1,11 @@
 #! /usr/bin/env node
-"use strict"
-const app = require("../lib/app");
-
-if (app.errorHandler) {
-    process.on("unhandledRejection", app.errorHandler);
-    process.on("uncaughtException", app.errorHandler);
+/* eslint-disable @typescript-eslint/no-var-requires */
+"use strict";
+if (require.main !== module) {
+    throw new Error("Can't import application executor as module");
 }
 
-app.default(process.argv.slice(1), process.env);
+const runner = require("../runtime/node-app");
+const manifest = require("../package.json");
+
+runner(manifest);
