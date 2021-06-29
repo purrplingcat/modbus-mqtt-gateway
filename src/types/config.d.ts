@@ -5,15 +5,15 @@ export type ConfigDict<T> = {[key: string]: T}
 
 export interface GatewayConfig {
     domain: string,
+    uid?: string,
     mqtt: MqttConfig,
     modbus: ConfigDict<ModbusConfig>,
     devices: ConfigDict<DeviceConfig>,
-    deviceAvailabilityHeartbeat?: number,
+    heartbeat: number,
 }
 
 export interface MqttConfig {
     brokerUrl: string,
-    introduction?: ConfigDict<string>
     options?: IClientOptions,
 }
 
@@ -25,9 +25,27 @@ export interface ModbusConfig {
 }
 
 export interface DeviceConfig {
+    meta?: DeviceMeta;
+    timeout?: number;
+    type?: string;
     bus: string;
     checkInterval?: number;
+    private?: boolean;
     registers: ConfigDict<RegistryConfig>
+}
+
+export interface DeviceMeta {
+    uid?: string;
+    type?: string;
+    location?: string;
+    alias?: string;
+    product?: string;
+    vendor?: string;
+    model?: string;
+    name?: string;
+    features?: string[];
+    tags?: string[];
+    stateRegister?: string;
 }
 
 export interface RegistryConfig {

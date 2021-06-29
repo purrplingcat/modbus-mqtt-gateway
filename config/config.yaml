@@ -1,17 +1,22 @@
-domain: modbus/gw0
+domain: home/modbus0
+uid: GW-modbus-gw0
 mqtt:
   brokerUrl: mqtt://127.0.0.1
-  introduction:
-    senses/presence: online
 modbus:
   main: 
     type: serial
     connectionString: /dev/ttyS4
     baudRate: 9600
 devices:
-  kitchenlight0: # Světlo v kuchyni
+  lgt-kitchen-light0: # Světlo v kuchyni
     bus: main
     checkInterval: 1000
+    meta:
+      type: device/light, light
+      name: Kuchyně - Světlo
+      product: Modbus relay
+      vendor: CallMeFoxie
+      location: kitchen
     registers:
       switch: # Vypínač
         access: RW

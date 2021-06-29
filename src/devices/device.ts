@@ -2,9 +2,12 @@ import { MqttClient } from "mqtt";
 import Peripheral from "./peripheral";
 import { equal } from "fast-shallow-equal";
 import consola from "consola";
-import { DeviceConfig } from "../types/config";
+import { DeviceConfig, DeviceMeta } from "../types/config";
 import setQueuedInterval, { sleep } from "../utils/interval";
 import { ModbusMaster } from "../exchange/modbus";
+import Discovery from "../discovery";
+import Handshake from "../discovery/handshake";
+import { getConfig } from "../gateway";
 
 export default class Device {
     name: string;
@@ -13,8 +16,13 @@ export default class Device {
     modbus: ModbusMaster;
     peripherals: Peripheral[];
     state: {};
+    _discovery?: Discovery;
     _available: boolean;
     _error: Error | null;
+    type: string;
+    keepalive: number;
+    meta: DeviceMeta;
+    gwUid: string;
 
     /**
      * 
@@ -23,15 +31,27 @@ export default class Device {
      * @param {object} config 
      * @param {MqttClient} mqtt 
      */
-    constructor(name: string, domain: string, config: DeviceConfig, mqtt: MqttClient, modbus: ModbusMaster) {
+    constructor(name: string, domain: string, gwUid: string, config: DeviceConfig, mqtt: MqttClient, modbus: ModbusMaster) {
         this.name = name;
         this.domain = domain
+        this.gwUid = gwUid;
         this.mqtt = mqtt
         this.modbus = modbus
+        this.meta = config.meta || {};
         this.peripherals = []
         this.state = {}
+        this.type = config.type ?? "device/generic";
+        this.keepalive = 0;
         this._available = false
         this._error = null
+
+        if (config.checkInterval) {
+            this.keepalive = config.timeout ?? 10 * config.checkInterval;
+        }
+
+        if (!config.private) {
+            this._discovery = new Discovery(this.mqtt, this._getHandshakePacket.bind(this), false, name)
+        }
 
         this._init(config)
         this.mqtt.on("connect", this.onConnect.bind(this))
@@ -77,39 +97,90 @@ export default class Device {
     }
 
     get available() {
+        //return true; // simulate
         return this.modbus.connected && this._available && !this._error;
     }
 
-    onConnect() {
-        this.mqtt.subscribe(this._topic("command"), (e, g) => consola.debug(g))
-        this.mqtt.subscribe(this._topic("set"), (e, g) => consola.debug(g))
+    private _getHandshakePacket(): Handshake {
+        const metaFeats = Array.isArray(this.meta.features) ? this.meta.features : [];
+        const metaTags = Array.isArray(this.meta.tags) ? this.meta.tags : [];
+        const gwConfig = getConfig();
+        const heartbeat = gwConfig.heartbeat ?? 0;
+
+        return {
+            _version: "1.0",
+            uid: this.meta.uid ?? this.name,
+            type: this.meta.type ?? "device/general",
+            product: this.meta.product ?? "Modbus generic device",
+            vendor: this.meta.vendor ?? "Various",
+            model: this.meta.model,
+            name: this.meta.name ?? "Modbus generic device",
+            alias: this.meta.alias,
+            location: this.meta.location,
+            platform: "modbus",
+            tags: [...metaTags, "modbus.device", "modbus.gw.device"],
+            features: [...metaFeats],
+            firmware: "modbus-gateway",
+            firmwareVersion: "1.0.0",
+            via: this.gwUid || this.domain,
+            keepalive: heartbeat > 0,
+            keepaliveTimeout: heartbeat * 2,
+            available: this.available,
+            comm: [
+                {topic: this._topic("state"), type: "state"},
+                {topic: this._topic("set"), type: "set"},
+                {topic: this._topic("get"), type: "fetch"}
+            ],
+            additional: {
+                bus: this.modbus.name,
+                connected: this.modbus.connected,
+                registers: this.peripherals.length,
+                stateRegister: this.meta.stateRegister || "switch",
+            }
+        }   
     }
 
-    onMessage(topic: string, message: string) {
+    handshake() {
+        this._discovery?.handshake(false);
+    }
+
+    onConnect() {
+        this.mqtt.subscribe(this._topic("+"), (e, g) => consola.debug(g))
+    }
+
+    onMessage(topic: string, message: Buffer) {
         if (topic === this._topic("command")) {
-            const command = JSON.parse(message) || {};
+            const command = JSON.parse(message.toString()) || {};
 
             this.handleCommand(command.name || "", command.payload || {})
+            return;
         }
 
-        if (topic === this._topic("set")) {
-            // shortcut to command "update" via dedicated topic "set"
-            // (this is for better compatibility with some home assistants)
-            const stateChanges = JSON.parse(message) || {};
-
-            this.handleCommand("update", stateChanges)
+        if (topic.startsWith(`${this.domain}/${this.name}/`)) {
+            const command = topic.replace(`${this.domain}/${this.name}/`, "");
+            
+            this.handleCommand(command, message.toString());
         }
     }
 
-    async handleCommand(command: string, payload: any) {
-        consola.withScope(this.name).debug(`Received command: ${command}`, payload)
-        switch (command) {
-            case "update":
-                this._handleUpdate(payload)
-                break
-            case "refresh":
-                this._handleRefresh(0)
-                break
+    commands: Record<string, (msg: string) => void> = {
+        get: () => this.sendState(),
+        set: (msg) => this._handleUpdate(JSON.parse(msg)),
+        refresh: () => this._handleRefresh(0),
+    }
+
+    async handleCommand(command: string, message: string) {
+        const logger = consola.withScope(this.name);
+        
+        if (this.commands[command]) {
+            logger.trace(command, message);
+
+            try {
+                this.commands[command].call(this, message);
+                logger.debug(`Called command: ${command}`);
+            } catch (err) {
+                logger.error(`Error while executing command '${command}':`, err);
+            }
         }
     }
 
@@ -203,12 +274,14 @@ export default class Device {
                 await readFromPeripheral(peripheral)
             }
 
+            this._discovery?.ping();
             this.resetError()
 
             return this.update(newState)
         } catch (err) {
             this.error(err)
             this.sendAvailability()
+            this._discovery?.dead();
             consola.withScope(this.name).error(err)
 
             return false
@@ -223,7 +296,11 @@ export default class Device {
 
     sendAvailability() {
         if (this.mqtt.connected && !this.mqtt.disconnecting) {
-            this.mqtt.publish(this._topic("presence"), this.available ? "online" : "offline")
+            if (this.available) {
+                this._discovery?.ping();
+            } else {
+                this._discovery?.dead();
+            }
         }
     }
 

@@ -6,16 +6,9 @@ const scope = {
     node: typeof process === "object" && typeof process.versions === "object" && process.versions.node != null,
 };
 
+global = typeof global === "object" ? global : typeof window === "object" ? window : {};
 global.NODE_APP = true;
-global.application = global.application || scope;
-
-if (!global.NODE_APP || global.application == null) {
-    throw new Error("Node application runtime is not initialized");
-}
-
-if (scope.runner != global.application.runner || scope.runnerVersion !== global.application.runnerVersion) {
-    throw new Error("Runner conflict");
-}
+global.application = scope;
 
 function loadAssembly(entrypoint) {
     return require(process.cwd() + "/" + entrypoint);

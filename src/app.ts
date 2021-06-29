@@ -1,4 +1,4 @@
-import consola from "consola";
+import consola, { LogLevel } from "consola";
 import yaml from "yaml"
 import fs from "fs"
 import startGateway, { createDefaultConfig } from "./gateway";
@@ -16,6 +16,8 @@ export default function run(argv: string[], env: NodeJS.ProcessEnv) {
         createDefaultConfig(), 
         yaml.parse(fs.readFileSync(configFile).toString())
     )
+
+    consola.level = LogLevel.Trace;
 
     consola.info("Starting gateway ...")
     startGateway(config);
