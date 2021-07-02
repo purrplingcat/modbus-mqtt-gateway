@@ -102,7 +102,7 @@ export default async function startGateway(config: GatewayConfig): Promise<void>
 
     const modbusConnections = await createModbusConnections(config.modbus)
     const client = createMqttClient(
-        domain,
+        gwUid,
         config.mqtt.brokerUrl,
         config.mqtt.options || {}
     )
