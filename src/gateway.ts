@@ -83,7 +83,10 @@ export function createDefaultConfig(): GatewayConfig {
         devices: {},
         modbus: {},
         mqtt: { brokerUrl: "" },
-        heartbeat: 500
+        heartbeat: {
+            interval: 500,
+            timeout: 5000,
+        }
     }
 }
 
@@ -140,5 +143,5 @@ export default async function startGateway(config: GatewayConfig): Promise<void>
     consola.success(`Initialized ${devices.length} devices`);
 
     // Devices availability heartbeat
-    setInterval(heartbeat, config.heartbeat || 500)
+    setInterval(heartbeat, config.heartbeat.interval || 500)
 }

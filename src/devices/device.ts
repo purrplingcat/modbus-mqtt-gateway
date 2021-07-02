@@ -23,6 +23,7 @@ export default class Device {
     keepalive: number;
     meta: DeviceMeta;
     gwUid: string;
+    alias?: string;
 
     /**
      * 
@@ -37,6 +38,7 @@ export default class Device {
         this.gwUid = gwUid;
         this.mqtt = mqtt
         this.modbus = modbus
+        this.alias = config.alias
         this.meta = config.meta || {};
         this.peripherals = []
         this.state = {}
@@ -105,26 +107,28 @@ export default class Device {
         const metaFeats = Array.isArray(this.meta.features) ? this.meta.features : [];
         const metaTags = Array.isArray(this.meta.tags) ? this.meta.tags : [];
         const gwConfig = getConfig();
-        const heartbeat = gwConfig.heartbeat ?? 0;
+        const heartbeat = gwConfig.heartbeat?.interval ?? 0;
+        const timeout = gwConfig.heartbeat?.timeout ?? 5000;
 
         return {
             _version: "1.0",
             uid: this.meta.uid ?? this.name,
             type: this.meta.type ?? "device/general",
             product: this.meta.product ?? "Modbus generic device",
-            vendor: this.meta.vendor ?? "Various",
+            vendor: this.meta.vendor ?? "Unknown",
             model: this.meta.model,
-            name: this.meta.name ?? "Modbus generic device",
-            alias: this.meta.alias,
+            name: this.meta.name ?? "Modbus device",
+            alias: this.alias,
+            description: this.meta.description,
             location: this.meta.location,
             platform: "modbus",
             tags: [...metaTags, "modbus.device", "modbus.gw.device"],
             features: [...metaFeats],
-            firmware: "modbus-gateway",
-            firmwareVersion: "1.0.0",
+            firmware: application.manifest.name,
+            firmwareVersion: application.manifest.version,
             via: this.gwUid || this.domain,
             keepalive: heartbeat > 0,
-            keepaliveTimeout: heartbeat * 2,
+            keepaliveTimeout: !!heartbeat ? timeout : 0,
             available: this.available,
             comm: [
                 {topic: this._topic("state"), type: "state"},
@@ -136,6 +140,7 @@ export default class Device {
                 connected: this.modbus.connected,
                 registers: this.peripherals.length,
                 stateRegister: this.meta.stateRegister || "switch",
+                gateway: `${application.manifest.name} ${application.manifest.version} by ${application.manifest.author}`
             }
         }   
     }

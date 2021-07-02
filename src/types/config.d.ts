@@ -9,7 +9,7 @@ export interface GatewayConfig {
     mqtt: MqttConfig,
     modbus: ConfigDict<ModbusConfig>,
     devices: ConfigDict<DeviceConfig>,
-    heartbeat: number,
+    heartbeat: { interval: number, timeout: number },
 }
 
 export interface MqttConfig {
@@ -25,6 +25,7 @@ export interface ModbusConfig {
 }
 
 export interface DeviceConfig {
+    alias?: string;
     meta?: DeviceMeta;
     timeout?: number;
     type?: string;
@@ -38,7 +39,6 @@ export interface DeviceMeta {
     uid?: string;
     type?: string;
     location?: string;
-    alias?: string;
     product?: string;
     vendor?: string;
     model?: string;
@@ -46,6 +46,7 @@ export interface DeviceMeta {
     features?: string[];
     tags?: string[];
     stateRegister?: string;
+    description?: string;
 }
 
 export interface RegistryConfig {

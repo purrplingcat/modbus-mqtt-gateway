@@ -1,5 +1,5 @@
-domain: home/modbus0
-uid: GW-modbus-gw0
+domain: device/modbus0
+uid: gw-modbus0
 mqtt:
   brokerUrl: mqtt://127.0.0.1
 modbus:
@@ -8,12 +8,14 @@ modbus:
     connectionString: /dev/ttyS4
     baudRate: 9600
 devices:
-  lgt-kitchen-light0: # Světlo v kuchyni
+  light-kitchen00: # Světlo v kuchyni
+    alias: light
     bus: main
     checkInterval: 1000
     meta:
       type: device/light, light
-      name: Kuchyně - Světlo
+      name: Světlo
+      description: Hlavní světlo kuchyně
       product: Modbus relay
       vendor: CallMeFoxie
       location: kitchen
@@ -34,7 +36,7 @@ devices:
       #  access: RW
       #  slave: 2
       #  address: 2
-  bathroomlight0: # Světlo v koupelně
+  light-bathroom00: # Světlo v koupelně
     bus: main
     checkInterval: 1000
     registers:
