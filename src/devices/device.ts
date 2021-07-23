@@ -24,6 +24,7 @@ export default class Device {
     meta: DeviceMeta;
     gwUid: string;
     alias?: string;
+    forceUpdate: boolean;
 
     /**
      * 
@@ -46,13 +47,15 @@ export default class Device {
         this.keepalive = 0;
         this._available = false
         this._error = null
+        this.forceUpdate = config.forceUpdate ?? false;
 
         if (config.checkInterval) {
             this.keepalive = config.timeout ?? 10 * config.checkInterval;
         }
 
-        if (!config.private) {
+        if (!config.secret) {
             this._discovery = new Discovery(this.mqtt, this._getHandshakePacket.bind(this), false, name)
+            this._discovery.logPinging = !!process.env.LOG_DISCOVERY_PINGS;
         }
 
         this._init(config)
@@ -95,7 +98,7 @@ export default class Device {
             )
         }
 
-        consola.info(`Device '${this.name}' initialized (${this.peripherals.length} peripherals, ${checkInterval} ms)`)
+        consola.info(`Device '${this.name}' initialized (${this.peripherals.length} peripherals, ${checkInterval} ms, force update: ${this.forceUpdate})`)
     }
 
     get available() {
@@ -120,8 +123,9 @@ export default class Device {
             name: this.meta.name ?? "Modbus device",
             alias: this.alias,
             description: this.meta.description,
-            location: this.meta.location,
+            location: this.meta.room,
             platform: "modbus",
+            stateFormat: "json",
             tags: [...metaTags, "modbus.device", "modbus.gw.device"],
             features: [...metaFeats],
             firmware: application.manifest.name,
@@ -130,6 +134,7 @@ export default class Device {
             keepalive: heartbeat > 0,
             keepaliveTimeout: !!heartbeat ? timeout : 0,
             available: this.available,
+            groups: this.meta.groups,
             comm: [
                 {topic: this._topic("state"), type: "state"},
                 {topic: this._topic("set"), type: "set"},
@@ -242,12 +247,12 @@ export default class Device {
         const prevState = this.state;
         const newState = { ...prevState, ...partialState }
 
-        if (equal(prevState, newState)) {
+        if (!this.forceUpdate && equal(prevState, newState)) {
             return false;
         }
 
         newState._updatedAt = new Date()
-        this.state = newState;
+        this.state = Object.freeze(newState);
         consola.withScope(this.name).debug(`State updated: ${this.name} at ${newState._updatedAt}`),
         consola.withScope(this.name).trace(`Changes payload: `, partialState)
 

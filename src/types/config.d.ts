@@ -31,14 +31,15 @@ export interface DeviceConfig {
     type?: string;
     bus: string;
     checkInterval?: number;
-    private?: boolean;
+    secret?: boolean;
     registers: ConfigDict<RegistryConfig>
+    forceUpdate: boolean;
 }
 
 export interface DeviceMeta {
     uid?: string;
     type?: string;
-    location?: string;
+    room?: string;
     product?: string;
     vendor?: string;
     model?: string;
@@ -47,6 +48,7 @@ export interface DeviceMeta {
     tags?: string[];
     stateRegister?: string;
     description?: string;
+    groups?: string[];
 }
 
 export interface RegistryConfig {

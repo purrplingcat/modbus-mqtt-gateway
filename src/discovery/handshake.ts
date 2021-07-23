@@ -18,12 +18,14 @@ type Handshake = {
     description?: string;
     comm?: CommChannel[];
     state?: Record<string, unknown>;
+    stateFormat?: "boolean" | "string" | "number" | "json";
     via?: string;
     platform?: PlatformType;
     features?: string[];
     tags?: string[];
     location?: string;
     additional?: unknown;
+    groups?: string[];
     _thread?: string;
     _version: "1.0";
 };

@@ -16,6 +16,7 @@ devices:
       type: device/light, light
       name: Světlo
       description: Hlavní světlo kuchyně
+      room: kitchen
       product: Modbus relay
       vendor: CallMeFoxie
       location: kitchen
