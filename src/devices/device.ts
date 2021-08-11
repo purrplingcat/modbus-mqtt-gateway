@@ -64,6 +64,19 @@ export default class Device {
     }
 
     _topic(...args: string[]) {
+        const config = getConfig();
+
+        if (config.mqtt.topicFormat === "fancy") {
+            const name = this.alias || this.name;
+            const id = this.meta.room ? `${this.meta.room}/${name}` : name;
+
+            return `${this.domain}/${id}/${args.join("/")}`;
+        }
+
+        if (config.mqtt.topicFormat === "gw-device-uid") {
+            return `${this.domain}/${this.gwUid}-${this.name}/${args.join("/")}`
+        }
+
         return `${this.domain}/${this.name}/${args.join("/")}`
     }
 
@@ -111,7 +124,7 @@ export default class Device {
         const metaTags = Array.isArray(this.meta.tags) ? this.meta.tags : [];
         const gwConfig = getConfig();
         const heartbeat = gwConfig.heartbeat?.interval ?? 0;
-        const timeout = gwConfig.heartbeat?.timeout ?? 5000;
+        const timeout = gwConfig.heartbeat?.timeout ?? heartbeat * 3;
 
         return {
             _version: "1.0",
@@ -132,7 +145,7 @@ export default class Device {
             firmwareVersion: application.manifest.version,
             via: this.gwUid || this.domain,
             keepalive: heartbeat > 0,
-            keepaliveTimeout: !!heartbeat ? timeout : 0,
+            keepaliveTimeout: heartbeat ? timeout : 0,
             available: this.available,
             groups: this.meta.groups,
             comm: [

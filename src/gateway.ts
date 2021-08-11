@@ -7,7 +7,7 @@ import { createSerialModbusConnection, ModbusMaster } from "./exchange/modbus";
 
 export const devices: Device[] = [];
 let gwConfig: GatewayConfig;
-let availableDevices: string[] = [];
+const availableDevices: Record<string, boolean> = {};
 
 function LoadDevices(gwUid: string, domain: string, client: MqttClient, modbusConnetions: ModbusMaster[], deviceConf: ConfigDict<DeviceConfig>, devices: Device[]) {
     Reflect.ownKeys(deviceConf).forEach(deviceName => {
@@ -25,32 +25,49 @@ function LoadDevices(gwUid: string, domain: string, client: MqttClient, modbusCo
 
 function heartbeat() {
     for (let device of devices) {
-        if (device.available) {
-            if (!availableDevices.includes(device.name)) {
-                availableDevices.push(device.name)
-                consola.withScope(device.name).info(`Presence: Device '${device.name}' is now ONLINE`)
-            }
-
-            return device.sendAvailability();
+        if (device.available && !availableDevices[device.name]) {
+            consola.withScope(device.name).info(`Presence: Device '${device.name}' is now ONLINE`)
         } 
         
-        if (!device.available && availableDevices.includes(device.name)) {
-            availableDevices = availableDevices.filter(dn => dn != device.name)
-            device.sendAvailability();
+        if (!device.available && availableDevices[device.name]) {
+            device.sendAvailability(); // Send death only once
             consola.withScope(device.name).info(`Presence: Device '${device.name}' is now OFFLINE`)
         }
+
+        if (device.available) {
+            device.sendAvailability(); // Send alive ping repeatedly while device is available
+        }
+
+        availableDevices[device.name] = device.available;
     }
 }
 
 function introduceDevice(device: Device) {
-    if (device.available) {
-        availableDevices.push(device.name)
-    }
-
+    availableDevices[device.name] = device.available;
     consola.withScope(device.name)
         .info(`Presence: Device '${device.name}' is ${device.available ? "ONLINE" : "OFFLINE"}`)
     device.handshake();
-    device.sendState()
+    device.sendState();
+}
+
+function checkForTopicConflicts(devices: Device[]) {
+    const knownTopics: Record<string, Device> = {};
+
+    for (const device of devices) {
+        const rootTopic = device._topic("#");
+
+        if (knownTopics.hasOwnProperty(rootTopic)) {
+            consola.warn(
+                "Device %s has conflicted root topic '%s' with device %s", 
+                device.name, 
+                rootTopic, 
+                knownTopics[rootTopic].name
+            );
+            continue;
+        }
+
+        knownTopics[rootTopic] = device;
+    }
 }
 
 async function createModbusConnections(config: ConfigDict<ModbusConfig>) {
@@ -82,7 +99,7 @@ export function createDefaultConfig(): GatewayConfig {
         domain: "modbus-gw",
         devices: {},
         modbus: {},
-        mqtt: { brokerUrl: "" },
+        mqtt: { brokerUrl: "", topicFormat: "device-uid" },
         heartbeat: {
             interval: 500,
             timeout: 5000,
@@ -93,9 +110,9 @@ export function createDefaultConfig(): GatewayConfig {
 export const getConfig = () => Object.freeze(gwConfig);
 
 export default async function startGateway(config: GatewayConfig): Promise<void> {
-    const _topic = (...args: string[]) => `${config.domain}/${args.join("/")}`;
     const domain = config.domain || "modbus-gw"
-    const gwUid = config.uid || config.domain;
+    const gwUid = config.uid || config.domain.replace(/\//g, "-");
+    const _topic = (...args: string[]) => `${domain}/${gwUid}/${args.join("/")}`;
     
     gwConfig = config;
     consola.info(`Domain: ${domain}`)
@@ -112,7 +129,6 @@ export default async function startGateway(config: GatewayConfig): Promise<void>
         consola.success(`Connected to MQTT broker: ${serverUrl} (clientId: ${client.options.clientId})`);
 
         client.subscribe(_topic("command"))
-        client.publish(_topic("presence"), "online")
         devices.forEach(introduceDevice)
         consola.success("Introduction sent")
     });
@@ -140,6 +156,7 @@ export default async function startGateway(config: GatewayConfig): Promise<void>
     });
 
     LoadDevices(gwUid, domain, client, modbusConnections, config.devices, devices);
+    checkForTopicConflicts(devices);
     consola.success(`Initialized ${devices.length} devices`);
 
     // Devices availability heartbeat

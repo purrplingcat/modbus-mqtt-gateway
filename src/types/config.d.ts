@@ -15,6 +15,7 @@ export interface GatewayConfig {
 export interface MqttConfig {
     brokerUrl: string,
     options?: IClientOptions,
+    topicFormat: "device-uid" | "gw-device-uid" | "fancy";
 }
 
 export interface ModbusConfig {
