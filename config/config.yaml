@@ -16,7 +16,7 @@ devices:
     bus: main
     checkInterval: 1000
     meta:
-      type: device/light, light
+      type: device/heater, light
       name: Světlo
       description: Hlavní světlo kuchyně
       room: kitchen

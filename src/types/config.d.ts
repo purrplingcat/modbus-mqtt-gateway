@@ -22,6 +22,7 @@ export interface ModbusConfig {
     type: "serial"
     connectionString: string
     baudRate?: number
+    timeout?: number
     options?: SerialPortOptions
 }
 
@@ -33,6 +34,7 @@ export interface DeviceConfig {
     bus: string;
     checkInterval?: number;
     secret?: boolean;
+    retain?: boolean;
     registers: ConfigDict<RegistryConfig>
     forceUpdate: boolean;
 }
@@ -50,6 +52,7 @@ export interface DeviceMeta {
     stateRegister?: string;
     description?: string;
     groups?: string[];
+    additional?: Record<string, unknown>
 }
 
 export interface RegistryConfig {
@@ -57,5 +60,6 @@ export interface RegistryConfig {
     slave: number,
     address: number,
     type?: "coil" | "holding" | "input"
-    count?: number
+    count?: number,
+    default?: number;
 }

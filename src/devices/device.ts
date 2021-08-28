@@ -25,6 +25,7 @@ export default class Device {
     gwUid: string;
     alias?: string;
     forceUpdate: boolean;
+    retain: boolean;
 
     /**
      * 
@@ -48,6 +49,7 @@ export default class Device {
         this._available = false
         this._error = null
         this.forceUpdate = config.forceUpdate ?? false;
+        this.retain = config.retain ?? false;
 
         if (config.checkInterval) {
             this.keepalive = config.timeout ?? 10 * config.checkInterval;
@@ -91,8 +93,8 @@ export default class Device {
             : 1000
 
         for (let register of Reflect.ownKeys(config.registers)) {
-            const { slave, address, access, count } = config.registers[<string>register];
-            const peripheral = new Peripheral(this, this.modbus, <string>register, slave, address, access, count)
+            const registerConfig = config.registers[<string>register];
+            const peripheral = new Peripheral(<string>register, this, this.modbus, registerConfig)
 
             if (peripheral.readable) {
                 initState[peripheral.name] = peripheral.getCurrentValue()
@@ -154,6 +156,7 @@ export default class Device {
                 {topic: this._topic("get"), type: "fetch"}
             ],
             additional: {
+                ...this.meta.additional,
                 bus: this.modbus.name,
                 connected: this.modbus.connected,
                 registers: this.peripherals.length,
@@ -313,7 +316,7 @@ export default class Device {
 
     sendState() {
         if (this.mqtt.connected && !this.mqtt.disconnecting) {
-            this.mqtt.publish(this._topic("state"), JSON.stringify(this.state))
+            this.mqtt.publish(this._topic("state"), JSON.stringify(this.state), {retain: this.retain})
         }
     }
 

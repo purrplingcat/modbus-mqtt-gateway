@@ -73,7 +73,7 @@ function checkForTopicConflicts(devices: Device[]) {
 async function createModbusConnections(config: ConfigDict<ModbusConfig>) {
     const promises: Promise<ModbusMaster>[] = []
     for (let busName of Reflect.ownKeys(config)) {
-        const { type, connectionString, baudRate, options } = config[<string>busName];
+        const { type, connectionString, baudRate, timeout, options } = config[<string>busName];
         
         switch (type) {
             case "serial":
@@ -82,6 +82,7 @@ async function createModbusConnections(config: ConfigDict<ModbusConfig>) {
                         <string>busName,
                         connectionString,
                         baudRate || 9600,
+                        timeout || 500,
                         options
                     )
                 )

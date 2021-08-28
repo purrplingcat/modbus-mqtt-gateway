@@ -43,13 +43,13 @@ export class ModbusMaster {
     }
 }
 
-export async function createSerialModbusConnection(name: string, device: string, baudRate: number, options?: SerialPortOptions) {
+export async function createSerialModbusConnection(name: string, device: string, baudRate: number, timeout: number, options?: SerialPortOptions) {
     const modbusClient = new ModbusRTU()
 
     try {
         consola.info(`Opening modbus connection '${name}' on serial port ${device} (${baudRate} bauds) ...`)
         await modbusClient.connectRTUBuffered(device, { baudRate, parity: "none", ...(options || {}) })
-        modbusClient.setTimeout(10000)
+        modbusClient.setTimeout(timeout)
     } catch (err) {
         consola.error(`Can't open modbus connection '${name}':  ${err.message} (${err.name})`)
         modbusClient.close(function() {})
