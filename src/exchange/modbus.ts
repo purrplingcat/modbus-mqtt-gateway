@@ -1,6 +1,6 @@
 import consola, { Consola } from "consola"
 import ModbusRTU from "modbus-serial"
-import { ReadRegisterResult, SerialPortOptions } from "modbus-serial/ModbusRTU";
+import { ReadRegisterResult, SerialPortOptions, TcpRTUPortOptions } from "modbus-serial/ModbusRTU";
 import { Pool } from "../devices/pool";
 import Semaphore from "../mutex/Semaphore";
 
@@ -54,6 +54,21 @@ export async function createSerialModbusConnection(name: string, device: string,
     try {
         consola.info(`Opening modbus connection '${name}' on serial port ${device} (${baudRate} bauds) ...`)
         await modbusClient.connectRTUBuffered(device, { baudRate, parity: "none", ...(options || {}) })
+        modbusClient.setTimeout(timeout)
+    } catch (err: any) {
+        consola.error(`Can't open modbus connection '${name}':  ${err.message} (${err.name})`)
+        modbusClient.close(function() {})
+    }
+
+    return new ModbusMaster(name, modbusClient);
+}
+
+export async function createTcpModbusConnection(name: string, ip: string, port: number, timeout: number, options?: TcpRTUPortOptions) {
+    const modbusClient = new ModbusRTU()
+
+    try {
+        consola.info(`Opening modbus TCP connection '${name}' ${ip}:${port} ...`)
+        await modbusClient.connectTcpRTUBuffered(ip, {port, ...(options || {})})
         modbusClient.setTimeout(timeout)
     } catch (err: any) {
         consola.error(`Can't open modbus connection '${name}':  ${err.message} (${err.name})`)

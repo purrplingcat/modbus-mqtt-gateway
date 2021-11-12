@@ -1,11 +1,12 @@
-import { MqttClient } from "mqtt";
 import consola from "consola";
 import Device from "./devices/device";
+import { MqttClient } from "mqtt";
 import { createMqttClient } from "./exchange/mqtt";
 import { ConfigDict, DeviceConfig, GatewayConfig, ModbusConfig, MqttConfig, PoolConfig } from "./types/config";
-import { createSerialModbusConnection, ModbusMaster } from "./exchange/modbus";
-import { EventEmitter } from "stream";
+import { createSerialModbusConnection, createTcpModbusConnection, ModbusMaster } from "./exchange/modbus";
 import { Pool } from "./devices/pool";
+import { SerialPortOptions, TcpRTUPortOptions } from "modbus-serial/ModbusRTU";
+import { URL } from "url";
 
 export const devices: Device[] = [];
 export const pools = new Map<string, Pool>();
@@ -87,20 +88,35 @@ function checkForTopicConflicts(devices: Device[]) {
 async function createModbusConnections(config: ConfigDict<ModbusConfig>) {
     const promises: Promise<ModbusMaster>[] = []
     for (let busName of Reflect.ownKeys(config)) {
-        const { type, connectionString, baudRate, timeout, options } = config[<string>busName];
+        const { connectionString, baudRate, timeout, options } = config[<string>busName];
+        const url = new URL(connectionString);
+        const type = url.protocol.replace(":", "");
         
         switch (type) {
             case "serial":
                 promises.push(
                     createSerialModbusConnection(
                         <string>busName,
-                        connectionString,
-                        baudRate || 9600,
+                        `${url.hostname}${url.pathname}`,
+                        Number(url.searchParams.get("baudRate")) || baudRate || 9600,
                         timeout || 500,
-                        options
+                        options as SerialPortOptions
                     )
                 )
                 break;
+            case "tcp":
+                const ip = url.hostname;
+                const port = Number(url.port) || 502;
+
+                promises.push(
+                    createTcpModbusConnection(
+                        <string>busName,
+                        ip,
+                        port,
+                        timeout || 500,
+                        options as TcpRTUPortOptions,
+                    )
+                )
             default:
                 consola.error(`${<string>busName}: Unknown modbus type '${type}'`)
         }

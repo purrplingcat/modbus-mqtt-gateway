@@ -1,4 +1,4 @@
-import { SerialPortOptions } from "modbus-serial/ModbusRTU";
+import { SerialPortOptions, TcpRTUPortOptions } from "modbus-serial/ModbusRTU";
 import { IClientOptions, MqttClient } from "mqtt";
 import { PoolOptions } from "../devices/pool";
 
@@ -21,11 +21,10 @@ export interface MqttConfig {
 }
 
 export interface ModbusConfig {
-    type: "serial"
     connectionString: string
     baudRate?: number
     timeout?: number
-    options?: SerialPortOptions
+    options?: SerialPortOptions | TcpRTUPortOptions
 }
 
 export interface DeviceConfig {
