@@ -1,5 +1,6 @@
 import { SerialPortOptions } from "modbus-serial/ModbusRTU";
 import { IClientOptions, MqttClient } from "mqtt";
+import { PoolOptions } from "../devices/pool";
 
 export type ConfigDict<T> = {[key: string]: T} 
 
@@ -10,6 +11,7 @@ export interface GatewayConfig {
     modbus: ConfigDict<ModbusConfig>,
     devices: ConfigDict<DeviceConfig>,
     heartbeat: { interval: number, timeout: number },
+    pools: PoolConfig[],
 }
 
 export interface MqttConfig {
@@ -29,10 +31,8 @@ export interface ModbusConfig {
 export interface DeviceConfig {
     alias?: string;
     meta?: DeviceMeta;
-    timeout?: number;
     type?: string;
     bus: string;
-    checkInterval?: number;
     secret?: boolean;
     retain?: boolean;
     registers: ConfigDict<RegistryConfig>
@@ -57,9 +57,11 @@ export interface DeviceMeta {
 
 export interface RegistryConfig {
     access: "R" | "W" | "RW",
-    slave: number,
-    address: number,
-    type?: "coil" | "holding" | "input"
-    count?: number,
+    pool: string;
+    field: number;
     default?: number;
+}
+
+export interface PoolConfig extends PoolOptions {
+    bus: string;
 }

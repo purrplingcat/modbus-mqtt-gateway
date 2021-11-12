@@ -45,18 +45,21 @@ export default class Semaphore implements ISemaphore {
         return ticketPromise;
     }
 
-    async runExclusive<T>(callback: ISemaphore.Worker<T>, priority = 0): Promise<T> {
+    async runExclusive<T>(callback: ISemaphore.Worker<T>, priority = 0, ttl = 0): Promise<T> {
         const [value, release] = await this.acquire(priority);
 
         try {
             return await callback(value);
+        } catch (err) {
+            if (ttl <= 0) { throw err }
+            return this.runExclusive(callback, priority++, --ttl);
         } finally {
             release();
         }
     }
 
     isLocked(): boolean {
-        return this._value <= 0;
+        return this._value <= this._maxConcurrency;
     }
 
     cancel(): void {

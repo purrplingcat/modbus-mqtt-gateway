@@ -4,7 +4,8 @@
   "main": "lib/app.js",
   "license": "MIT",
   "scripts": {
-    "start": "node lib/gateway.js",
+    "dev": "tsc --sourceMap && NODE_OPTIONS=--enable-source-maps bin/modbus-mqtt-gw.js",
+    "start": "bin/modbus-mqtt-gw.js",
     "build": "tsc"
   },
   "dependencies": {

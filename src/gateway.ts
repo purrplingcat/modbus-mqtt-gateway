@@ -2,25 +2,39 @@ import { MqttClient } from "mqtt";
 import consola from "consola";
 import Device from "./devices/device";
 import { createMqttClient } from "./exchange/mqtt";
-import { ConfigDict, DeviceConfig, GatewayConfig, ModbusConfig, MqttConfig } from "./types/config";
+import { ConfigDict, DeviceConfig, GatewayConfig, ModbusConfig, MqttConfig, PoolConfig } from "./types/config";
 import { createSerialModbusConnection, ModbusMaster } from "./exchange/modbus";
+import { EventEmitter } from "stream";
+import { Pool } from "./devices/pool";
 
 export const devices: Device[] = [];
+export const pools = new Map<string, Pool>();
 let gwConfig: GatewayConfig;
 const availableDevices: Record<string, boolean> = {};
 
-function LoadDevices(gwUid: string, domain: string, client: MqttClient, modbusConnetions: ModbusMaster[], deviceConf: ConfigDict<DeviceConfig>, devices: Device[]) {
+function LoadDevices(gwUid: string, domain: string, client: MqttClient, deviceConf: ConfigDict<DeviceConfig>, devices: Device[]) {
     Reflect.ownKeys(deviceConf).forEach(deviceName => {
         const conf = deviceConf[<string>deviceName] || {};
-        const modbusMaster = modbusConnetions.find(m => m.name === conf.bus)
+        devices.push(new Device(<string>deviceName, domain, gwUid, conf, client))
+    });
+}
 
-        if (modbusMaster == null) {
-            consola.error(`Unknown modbus connection with name '${conf.bus}' for device '${<string>deviceName}'`);
-            return;
+function LoadPools(modbusConnections: ModbusMaster[], poolConfigs: PoolConfig[]) {
+    for (const poolConfig of poolConfigs) {
+        const modbus = modbusConnections.find(m => m.name === poolConfig.bus);
+
+        if (!modbus) {
+            throw new Error(`Modbus ${poolConfig.bus} doesn't exist`);
         }
 
-        devices.push(new Device(<string>deviceName, domain, gwUid, conf, client, modbusMaster))
-    });
+        if (pools.has(poolConfig.name)) {
+            throw new Error(`Pool ${poolConfig.name} already exists!`);
+        }
+
+        pools.set(poolConfig.name, new Pool(modbus, poolConfig))
+    }
+
+    consola.info(`Initialized ${pools.size} pools`);
 }
 
 function heartbeat() {
@@ -101,6 +115,7 @@ export function createDefaultConfig(): GatewayConfig {
         devices: {},
         modbus: {},
         mqtt: { brokerUrl: "", topicFormat: "device-uid" },
+        pools: [],
         heartbeat: {
             interval: 500,
             timeout: 5000,
@@ -156,7 +171,8 @@ export default async function startGateway(config: GatewayConfig): Promise<void>
         }
     });
 
-    LoadDevices(gwUid, domain, client, modbusConnections, config.devices, devices);
+    LoadPools(modbusConnections, config.pools);
+    LoadDevices(gwUid, domain, client, config.devices, devices);
     checkForTopicConflicts(devices);
     consola.success(`Initialized ${devices.length} devices`);
 

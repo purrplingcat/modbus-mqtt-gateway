@@ -13,10 +13,9 @@ heartbeat:
 devices:
   kitchen-light1: # Světlo v kuchyni
     alias: light
-    bus: main
     checkInterval: 1000
     meta:
-      type: device/heater, light
+      type: device/light, light
       name: Světlo
       description: Hlavní světlo kuchyně
       room: kitchen
@@ -25,12 +24,12 @@ devices:
     registers:
       switch: # Vypínač
         access: RW
-        slave: 255
-        address: 1
+        pool: kitchen-sw
+        field: 1
       current: # Měřič proudu světla
         access: R
-        slave: 255
-        address: 0
+        pool: kitchen-sw
+        field: 0
       #brightness: # Jas
       #  access: RW
       #  slave: 2
@@ -48,19 +47,19 @@ devices:
     registers:
       switch: # Vypínač
         access: RW
-        slave: 255
+        pool: bathroom-sw
         address: 1
       switch1: # Vypínač
         access: RW
-        slave: 255
+        pool: bathroom-sw
         address: 1
       switch2: # Vypínač
         access: RW
-        slave: 255
+        pool: bathroom-sw
         address: 1
       switch3: # Vypínač
         access: RW
-        slave: 255
+        pool: bathroom-sw
         address: 1
   #    current: # Měřič proudu světla
   #      access: R
@@ -74,3 +73,12 @@ devices:
   #      access: RW
   #      slave: 4
   #      address: 2
+pools:
+  - name: kitchen-sw
+    bus: main
+    unit: 255
+    length: 3
+  - name: bathroom-sw
+    bus: main
+    unit: 254
+    length: 3

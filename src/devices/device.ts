@@ -7,20 +7,18 @@ import setQueuedInterval, { sleep } from "../utils/interval";
 import { ModbusMaster } from "../exchange/modbus";
 import Discovery from "../discovery";
 import Handshake from "../discovery/handshake";
-import { getConfig } from "../gateway";
+import { getConfig, pools } from "../gateway";
 
 export default class Device {
     name: string;
     domain: string;
     mqtt: MqttClient;
-    modbus: ModbusMaster;
     peripherals: Peripheral[];
     state: {};
     _discovery?: Discovery;
     _available: boolean;
     _error: Error | null;
     type: string;
-    keepalive: number;
     meta: DeviceMeta;
     gwUid: string;
     alias?: string;
@@ -34,26 +32,20 @@ export default class Device {
      * @param {object} config 
      * @param {MqttClient} mqtt 
      */
-    constructor(name: string, domain: string, gwUid: string, config: DeviceConfig, mqtt: MqttClient, modbus: ModbusMaster) {
+    constructor(name: string, domain: string, gwUid: string, config: DeviceConfig, mqtt: MqttClient) {
         this.name = name;
         this.domain = domain
         this.gwUid = gwUid;
-        this.mqtt = mqtt
-        this.modbus = modbus
+        this.mqtt = mqtt;
         this.alias = config.alias
         this.meta = config.meta || {};
         this.peripherals = []
         this.state = {}
         this.type = config.type ?? "device/generic";
-        this.keepalive = 0;
         this._available = false
         this._error = null
         this.forceUpdate = config.forceUpdate ?? false;
         this.retain = config.retain ?? false;
-
-        if (config.checkInterval) {
-            this.keepalive = config.timeout ?? 10 * config.checkInterval;
-        }
 
         if (!config.secret) {
             this._discovery = new Discovery(this.mqtt, this._getHandshakePacket.bind(this), false, name)
@@ -88,13 +80,10 @@ export default class Device {
      */
     _init(config: DeviceConfig) {
         const initState: any = {}
-        const checkInterval = config.checkInterval != null
-            ? config.checkInterval
-            : 1000
 
         for (let register of Reflect.ownKeys(config.registers)) {
             const registerConfig = config.registers[<string>register];
-            const peripheral = new Peripheral(<string>register, this, this.modbus, registerConfig)
+            const peripheral = new Peripheral(<string>register, this, registerConfig)
 
             if (peripheral.readable) {
                 initState[peripheral.name] = peripheral.getCurrentValue()
@@ -106,19 +95,12 @@ export default class Device {
         this.update(initState);
         this._available = true
 
-        if (checkInterval > 0) {
-            setQueuedInterval(
-                this._handleRefresh.bind(this, 10),
-                checkInterval
-            )
-        }
-
-        consola.info(`Device '${this.name}' initialized (${this.peripherals.length} peripherals, ${checkInterval} ms, force update: ${this.forceUpdate})`)
+        consola.info(`Device '${this.name}' initialized (${this.peripherals.length} peripherals, force update: ${this.forceUpdate})`)
     }
 
     get available() {
         //return true; // simulate
-        return this.modbus.connected && this._available && !this._error;
+        return this.peripherals.some(p => p.available) && this._available && !this._error;
     }
 
     private _getHandshakePacket(): Handshake {
@@ -157,8 +139,6 @@ export default class Device {
             ],
             additional: {
                 ...this.meta.additional,
-                bus: this.modbus.name,
-                connected: this.modbus.connected,
                 registers: this.peripherals.length,
                 stateRegister: this.meta.stateRegister || "switch",
                 gateway: `${application.manifest.name} ${application.manifest.version} by ${application.manifest.author}`
@@ -192,7 +172,7 @@ export default class Device {
     commands: Record<string, (msg: string) => void> = {
         get: () => this.sendState(),
         set: (msg) => this._handleUpdate(JSON.parse(msg)),
-        refresh: () => this._handleRefresh(0),
+        refresh: () => this.peripherals.forEach(p => p.read()),
     }
 
     async handleCommand(command: string, message: string) {
@@ -210,7 +190,7 @@ export default class Device {
         }
     }
 
-    async _handleUpdate(payload: any) {
+    private async _handleUpdate(payload: any) {
         const promises: Promise<void>[] = []
         const newState: any = {}
 
@@ -240,16 +220,14 @@ export default class Device {
                 this.sendState()
             }
         } catch (err) {
-            this.error(err)
+            this.error(<Error>err)
             this.sendAvailability()
             consola.withScope(this.name).error(err)
         }
     }
 
-    async _handleRefresh(queuePriority: number) {
-        const updated = await this.refresh(queuePriority)
-
-        if (updated) {
+    async _handleRefresh() {
+        if (this.refresh()) {
             this.sendState()
         }
     }
@@ -279,39 +257,22 @@ export default class Device {
      * 
      * @returns {Promise<boolean>}
      */
-    async refresh(queuePriority = 0): Promise<boolean> {
+    refresh(): boolean {
         const newState: any = {}
 
-        if (!this.modbus.connected) {
-            return false
-        }
-
-        async function readFromPeripheral(peripheral: Peripheral) {
-            newState[peripheral.name] = await peripheral.read(queuePriority)
-        }
-
-        try {
-            for (let peripheral of this.peripherals) {
-                if (!peripheral.readable) {
-                    continue;
-                }
-
-                consola.withScope(this.name).debug(`refresh ${peripheral.name} on device ${this.name}`)
-                await readFromPeripheral(peripheral)
+        for (let peripheral of this.peripherals) {
+            if (!peripheral.readable) {
+                continue;
             }
 
-            this._discovery?.ping();
-            this.resetError()
-
-            return this.update(newState)
-        } catch (err) {
-            this.error(err)
-            this.sendAvailability()
-            this._discovery?.dead();
-            consola.withScope(this.name).error(err)
-
-            return false
+            consola.withScope(this.name).debug(`refresh ${peripheral.name} on device ${this.name}`)
+            newState[peripheral.name] = peripheral.getCurrentValue();
         }
+
+        this._discovery?.ping();
+        this.resetError()
+
+        return this.update(newState) && this.available;
     }
 
     sendState() {
