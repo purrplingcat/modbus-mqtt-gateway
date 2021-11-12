@@ -8,8 +8,10 @@
     "start": "bin/modbus-mqtt-gw.js",
     "build": "tsc"
   },
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "dependencies": {
-    "async-mutex": "^0.3.1",
     "consola": "^2.15.3",
     "fast-shallow-equal": "^1.0.0",
     "modbus-serial": "^8.0.1",
@@ -17,7 +19,7 @@
     "yaml": "^1.10.2"
   },
   "devDependencies": {
-    "@types/node": "^15.3.1",
+    "@types/node": "^16.11.7",
     "typescript": "^4.2.4"
   }
 }
