@@ -1,9 +1,10 @@
 import { MqttClient } from "mqtt";
+import path from "path";
 import Peripheral from "./peripheral";
 import { equal } from "fast-shallow-equal";
 import consola from "consola";
 import { DeviceConfig, DeviceMeta } from "../types/config";
-import setQueuedInterval, { sleep } from "../utils/interval";
+import setQueuedInterval, { QueuedInterval, sleep } from "../utils/interval";
 import { ModbusMaster } from "../exchange/modbus";
 import Discovery from "../discovery";
 import Handshake from "../discovery/handshake";
@@ -14,7 +15,7 @@ export default class Device {
     domain: string;
     mqtt: MqttClient;
     peripherals: Peripheral[];
-    state: {};
+    state: Record<string, number | string | null>;
     _discovery?: Discovery;
     _available: boolean;
     _error: Error | null;
@@ -40,7 +41,7 @@ export default class Device {
         this.alias = config.alias
         this.meta = config.meta || {};
         this.peripherals = []
-        this.state = {}
+        this.state = {error: null}
         this.type = config.type ?? "device/generic";
         this._available = false
         this._error = null
@@ -52,7 +53,7 @@ export default class Device {
             this._discovery.logPinging = !!process.env.LOG_DISCOVERY_PINGS;
         }
 
-        this._init(config)
+        this._init(config);
         this.mqtt.on("connect", this.onConnect.bind(this))
         this.mqtt.on("message", this.onMessage.bind(this))
     }
@@ -61,17 +62,17 @@ export default class Device {
         const config = getConfig();
 
         if (config.mqtt.topicFormat === "fancy") {
-            const name = this.alias || this.name;
-            const id = this.meta.room ? `${this.meta.room}/${name}` : name;
+            const name = this.alias || this.name || "";
+            const id = path.join(this.meta.room ?? "", name);
 
-            return `${this.domain}/${id}/${args.join("/")}`;
+            return path.join(this.domain, id, ...args);
         }
 
         if (config.mqtt.topicFormat === "gw-device-uid") {
-            return `${this.domain}/${this.gwUid}-${this.name}/${args.join("/")}`
+            return path.join(this.domain, `${this.gwUid}-${this.name}`, ...args);
         }
 
-        return `${this.domain}/${this.name}/${args.join("/")}`
+        return path.join(this.domain, this.name, ...args);
     }
 
     /**
@@ -154,6 +155,21 @@ export default class Device {
         this.mqtt.subscribe(this._topic("+"), (e, g) => consola.debug(g))
     }
 
+    onTick() {
+        const errors: string[] = [];
+        errors.push(...this.peripherals.filter((p) => !p.available).map((p) => `Peripheral ${p.name} is unavailable`));
+
+        if (this._error) {
+            errors.push(this._error.message);
+        }
+
+        const errMsg = errors.length ? errors.join("\n") : null;
+
+        if (this.state.error !== errMsg && this.update({error: errMsg})) {
+            this.sendState();
+        }
+    }
+
     onMessage(topic: string, message: Buffer) {
         if (topic === this._topic("command")) {
             const command = JSON.parse(message.toString()) || {};
@@ -162,8 +178,8 @@ export default class Device {
             return;
         }
 
-        if (topic.startsWith(`${this.domain}/${this.name}/`)) {
-            const command = topic.replace(`${this.domain}/${this.name}/`, "");
+        if (topic.startsWith(this._topic("/"))) {
+            const command = topic.replace(this._topic("/"), "");
             
             this.handleCommand(command, message.toString());
         }
@@ -195,7 +211,7 @@ export default class Device {
         const newState: any = {}
 
         if (!this.available) {
-            consola.withScope(this.name).log("Can't update state: Device is unavailable")
+            consola.withScope(this.name).info("Can't update state: Device is unavailable")
             this.sendAvailability()
             return
         }
@@ -277,7 +293,7 @@ export default class Device {
 
     sendState() {
         if (this.mqtt.connected && !this.mqtt.disconnecting) {
-            this.mqtt.publish(this._topic("state"), JSON.stringify(this.state), {retain: this.retain})
+            this.mqtt.publish(this._topic(), JSON.stringify(this.state), {retain: this.retain})
         }
     }
 

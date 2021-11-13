@@ -1,10 +1,13 @@
 import consola, { Consola } from "consola"
 import ModbusRTU from "modbus-serial"
-import { ReadRegisterResult, SerialPortOptions, TcpRTUPortOptions } from "modbus-serial/ModbusRTU";
-import { Pool } from "../devices/pool";
+import { SerialPortOptions, TcpRTUPortOptions } from "modbus-serial/ModbusRTU";
 import Semaphore from "../mutex/Semaphore";
 
-type Dict<V> = { [key: string]: V };
+export type RegisterOperationOptions = {
+    priority?: number;
+    timeout?: number;
+    ttl?: number;
+}
 
 export class ModbusMaster {
     name: string;
@@ -25,26 +28,34 @@ export class ModbusMaster {
         return this.modbus.isOpen
     }
 
-    async readRegisters(slave: number, address: number, length: number, priority = 0, timeout?: number): Promise<number[]> {
+    async readRegisters(slave: number, address: number, length: number, options?: RegisterOperationOptions): Promise<number[]> {
+        if (slave == null) throw new Error("Parameter 'slave' is not defined");
+        if (address == null) throw new Error("Parameter 'address' is not defined");
+        if (length == null) throw new Error("Parameter 'length' is not defined");
+
         return await this._semaphore.runExclusive(async () => {
             this._logger.trace(`Start reading registry ${address} from slave ${slave}`)
             this.modbus.setID(slave)
-            this.modbus.setTimeout(timeout ?? this.timeout);
+            this.modbus.setTimeout(options?.timeout ?? this.timeout);
             const result = await this.modbus.readHoldingRegisters(address, length)
             this._logger.trace(`Registry ${address} from slave ${slave} read`, result)
             
             return result.data;
-        }, priority);
+        }, options?.priority ?? 0, options?.ttl ?? 0);
     }
 
-    async writeRegister(slave: number, address: number, value: number, priority = 0, timeout?: number) {
+    async writeRegister(slave: number, address: number, value: number, options?: RegisterOperationOptions) {
+        if (slave == null) throw new Error("Parameter 'slave' is not defined");
+        if (address == null) throw new Error("Parameter 'address' is not defined");
+        if (value == null) throw new Error("Parameter 'value' is not defined");
+
         return await this._semaphore.runExclusive(async () => {
             this._logger.trace(`Start writing registry ${address} to slave ${slave}, value: ${value}`)
             this.modbus.setID(slave);
-            this.modbus.setTimeout(timeout ?? this.timeout)
+            this.modbus.setTimeout(options?.timeout ?? this.timeout)
             await this.modbus.writeRegister(address, value)
             this._logger.trace(`Value ${value} written in registry ${address} in slave ${slave}`)
-        }, priority)
+        }, options?.priority ?? 0, options?.ttl ?? 0)
     }
 }
 

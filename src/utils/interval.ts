@@ -1,45 +1,36 @@
 export class QueuedInterval {
-    id: NodeJS.Timeout | null;
+    interval: number;
+    private _id: NodeJS.Timeout | null;
     private _fn: (...args: any[]) => void | Promise<void>;
-    private _interval: number;
 
     constructor(fn: (...args: any[]) => void | Promise<void>, interval: number) {
         this._fn = fn;
-        this._interval = interval;
         this._loop = this._loop.bind(this)
-        this.id = null;
+        this._id = null;
+        this.interval = interval;
     }
 
-    get interval(): number {
-        return this._interval;
-    }
-
-    set interval(value: number) {
-        this._interval = value;
-
-        if (this.isRunning()) {
-            this.stop();
-            this.start();
-        }
+    get id(): NodeJS.Timeout | null {
+        return this.id;
     }
 
     private async _loop() {
         await this._fn()
-        this.id = setTimeout(this._loop, this._interval)
+        this._id = setTimeout(this._loop, this.interval)
     }
 
     isRunning() {
-        return !!this.id;
+        return !!this._id;
     }
 
     start() {
-        this.id = setTimeout(this._loop, this._interval)
+        this._id = setTimeout(this._loop, this.interval)
     }
 
     stop() {
-        if (this.id) {
-            clearTimeout(this.id)
-            this.id = null;
+        if (this._id) {
+            clearTimeout(this._id)
+            this._id = null;
         }
     }
 }

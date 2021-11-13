@@ -7,13 +7,18 @@ import { createSerialModbusConnection, createTcpModbusConnection, ModbusMaster }
 import { Pool } from "./devices/pool";
 import { SerialPortOptions, TcpRTUPortOptions } from "modbus-serial/ModbusRTU";
 import { URL } from "url";
+import { QueuedInterval } from "./utils/interval";
 
 export const devices: Device[] = [];
 export const pools = new Map<string, Pool>();
 let gwConfig: GatewayConfig;
 const availableDevices: Record<string, boolean> = {};
 
-function LoadDevices(gwUid: string, domain: string, client: MqttClient, deviceConf: ConfigDict<DeviceConfig>, devices: Device[]) {
+const ticker = new QueuedInterval(() => {
+    devices.forEach((d) => d.onTick());
+}, Number(process.env.TICK_INTERVAL || 1000));
+
+function LoadDevices(gwUid: string, domain: string, client: MqttClient, deviceConf: ConfigDict<DeviceConfig>) {
     Reflect.ownKeys(deviceConf).forEach(deviceName => {
         const conf = deviceConf[<string>deviceName] || {};
         devices.push(new Device(<string>deviceName, domain, gwUid, conf, client))
@@ -105,18 +110,16 @@ async function createModbusConnections(config: ConfigDict<ModbusConfig>) {
                 )
                 break;
             case "tcp":
-                const ip = url.hostname;
-                const port = Number(url.port) || 502;
-
                 promises.push(
                     createTcpModbusConnection(
                         <string>busName,
-                        ip,
-                        port,
+                        url.hostname,
+                        Number(url.port) || 502,
                         timeout || 500,
                         options as TcpRTUPortOptions,
                     )
                 )
+                break;
             default:
                 consola.error(`${<string>busName}: Unknown modbus type '${type}'`)
         }
@@ -173,7 +176,7 @@ export default async function startGateway(config: GatewayConfig): Promise<void>
         consola.error(`MQTT error: ${err.message}`, err);
     })
 
-    client.on('message', function (topic, message) {
+    client.on("message", function (topic, message) {
         if (!client.connected || client.disconnecting) {
             return;
         }
@@ -188,10 +191,13 @@ export default async function startGateway(config: GatewayConfig): Promise<void>
     });
 
     LoadPools(modbusConnections, config.pools);
-    LoadDevices(gwUid, domain, client, config.devices, devices);
+    LoadDevices(gwUid, domain, client, config.devices);
     checkForTopicConflicts(devices);
     consola.success(`Initialized ${devices.length} devices`);
 
+    // Start ticker ticking
+    ticker.start();
+    
     // Devices availability heartbeat
     setInterval(heartbeat, config.heartbeat.interval || 500)
 }

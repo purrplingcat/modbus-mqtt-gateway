@@ -6,6 +6,7 @@
  * My edit adds support for priorities in queue
  */
 
+import consola from "consola";
 import ISemaphore from "./ISemaphore";
 
 export const E_CANCELED = new Error("Request for lock canceled");
@@ -52,14 +53,14 @@ export default class Semaphore implements ISemaphore {
             return await callback(value);
         } catch (err) {
             if (ttl <= 0) { throw err }
-            return this.runExclusive(callback, priority++, --ttl);
+            return this.runExclusive(callback, ++priority, --ttl);
         } finally {
             release();
         }
     }
 
     isLocked(): boolean {
-        return this._value <= this._maxConcurrency;
+        return this._value <= 0;
     }
 
     cancel(): void {

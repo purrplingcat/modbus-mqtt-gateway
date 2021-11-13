@@ -5,8 +5,8 @@ mqtt:
   topicFormat: fancy
 modbus:
   main: 
-    connectionString: serial:/dev/ttyS4
-    baudRate: 9600
+    connectionString: tcp://127.0.0.1:8502
+    # baudRate: 9600
 heartbeat:
   interval: 2000
 devices:
