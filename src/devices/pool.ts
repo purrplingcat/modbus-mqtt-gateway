@@ -94,11 +94,9 @@ export class Pool extends EventEmitter implements PoolOptions {
         const promises: Promise<void>[] = [];
 
         for (const [i, val] of values.entries()) {
-            console.log("requuest", i);
             const write = async () => {
                 await this._modbus.writeRegister(this.unit, this.offset + field + i, val, opts);
                 this.data[field + i] = val;
-                console.log(this.data[field + i])
             };
 
             promises.push(write());

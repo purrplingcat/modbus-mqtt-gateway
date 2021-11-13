@@ -87,7 +87,6 @@ export default class Peripheral {
     }
 
     private _onPoolUpdate(data: number[]) {
-        console.log("in update", data);
         if (this.field > data.length) {
             return consola.warn(
                 `Peripheral ${this.device.name}.${this.name}: Field ${this.field} is out of range (pool '${this.pool}' length ${data.length})`
@@ -97,7 +96,6 @@ export default class Peripheral {
         const view = new DataView(wordArray.buffer, 0);
 
         this._value = decode(this.format, view, this.field * 2, this.endian === "little");
-        console.log("new value", this._value);
     }
 
     async read() {

@@ -1,6 +1,7 @@
 // create an empty modbus client
 let x = 60000;
 let g = {};
+const consola = require("consola");
 const ModbusRTU = require("modbus-serial");
 const vector = {
     getInputRegister: function(addr, unitID) {
@@ -9,17 +10,17 @@ const vector = {
     },
     getMultipleHoldingRegisters: function(addr, length, unitID, callback) {
         // Asynchronous handling (with callback)
-        console.log(`Read ${addr} length ${length}, unit ${unitID}`);
+        consola.log(`Read ${addr} length ${length}, unit ${unitID}`);
         setTimeout(function() {
             const r = [];
-            console.log(g);
+            consola.trace(g);
             for (let i = 0; i < length; i++) { 
                 if (g[`${unitID}.${addr + i}`] == null) {
                     g[`${unitID}.${addr + i}`] = Math.max(0, addr + x + (unitID - i))
                 }
                 r.push(g[`${unitID}.${addr + i}`]) 
             }
-            console.log("Output data", r);
+            consola.debug("Output data", r);
             callback(null, r);
         }, 10);
     },
@@ -33,14 +34,14 @@ const vector = {
     },
     setRegister: function(addr, value, unitID) {
         // Asynchronous handling supported also here
-        console.log("set register", unitID, addr, value);
+        consola.log("set register", unitID, addr, value);
         g[`${unitID}.${addr}`] = value;
-        console.log(g);
+        consola.trace(g);
         return;
     },
     setCoil: function(addr, value, unitID) {
         // Asynchronous handling supported also here
-        console.log("set coil", addr, value, unitID);
+        consola.log("set coil", addr, value, unitID);
         return;
     },
     readDeviceIdentification: function(addr) {
@@ -55,17 +56,20 @@ const vector = {
     }
 };
 
+consola.level = Number(process.env.LOG_LEVEL ?? 3)
+
 // set the server to answer for modbus requests
-console.log("ModbusTCP listening on modbus://127.0.0.1:8502");
+consola.info("ModbusTCP listening on modbus://127.0.0.1:8502");
 var serverTCP = new ModbusRTU.ServerTCP(vector, { host: "127.0.0.1", port: 8502, debug: true, unitID: 255 });
 
 serverTCP.on("socketError", function(err){
     // Handle socket error if needed, can be ignored
-    console.error(err);
+    consola.error(err);
 });
 
+// Refresh base data every 30s. It generates new sample data for each device registry
 setInterval(() => {
     g = {}
     x = Math.round(Math.random() * 10000)
-    console.log("# new base", x);
+    consola.info("new base", x, new Date());
 }, 30000);
