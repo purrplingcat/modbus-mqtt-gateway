@@ -1,5 +1,6 @@
 import consola from "consola";
 import { EventEmitter } from "events";
+import { equal } from "fast-shallow-equal";
 import { ModbusMaster, RegisterOperationOptions } from "../exchange/modbus";
 import { QueuedInterval } from "../utils/interval";
 
@@ -63,12 +64,18 @@ export class Pool extends EventEmitter implements PoolOptions {
         if (!this._modbus.connected) { return; }
 
         const opts: RegisterOperationOptions = { priority, timeout: this.readTimeout, ttl: this.ttl };
+        let updated = false;
 
         try {
-            this.data = await this._modbus.readRegisters(this.unit, this.offset, this.length, opts);
+            const data = await this._modbus.readRegisters(this.unit, this.offset, this.length, opts);
             consola.trace(`Pool ${this.name}: Read data`, this.data);
             this._available = true;
-            this.emit("update", this.data);
+
+            if (!equal(this.data, data)) {
+                this.data = data;
+                this.emit("update", this.data);
+                updated = true;
+            }
         } catch (err) {
             this._available = false;
             this.emit("error", err);
@@ -77,6 +84,7 @@ export class Pool extends EventEmitter implements PoolOptions {
                 this._cycle.interval = this.interval * (!this.available ? this.intervalDilation : 1);
             }
             this._refreshTask = null;
+            process.nextTick(() => this.emit("done", updated));
         }
     }
 
@@ -86,6 +94,7 @@ export class Pool extends EventEmitter implements PoolOptions {
         await this._modbus.writeRegister(this.unit, this.offset + field, value, opts);
         this.data[field] = value;
         this.emit("update", this.data);
+        process.nextTick(() => this.emit("done", true));
     }
 
     refresh(priority = 0): Promise<void> {

@@ -1,4 +1,4 @@
-import { MqttClient } from "mqtt";
+import { MqttClient, QoS } from "mqtt";
 import path from "path";
 import Peripheral from "./peripheral";
 import { equal } from "fast-shallow-equal";
@@ -25,6 +25,8 @@ export default class Device {
     alias?: string;
     forceUpdate: boolean;
     retain: boolean;
+    qos: QoS;
+    private _needsPublishState: boolean;
 
     /**
      * 
@@ -45,8 +47,10 @@ export default class Device {
         this.type = config.type ?? "device/generic";
         this._available = false
         this._error = null
+        this._needsPublishState = false;
         this.forceUpdate = config.forceUpdate ?? false;
         this.retain = config.retain ?? false;
+        this.qos = config.qos ?? 0;
 
         if (!config.secret) {
             this._discovery = new Discovery(this.mqtt, this._getHandshakePacket.bind(this), false, name)
@@ -81,6 +85,7 @@ export default class Device {
      */
     _init(config: DeviceConfig) {
         const initState: any = {}
+        const done = (updated: boolean) => updated && this.refresh() && this.sendState();
 
         for (let register of Reflect.ownKeys(config.registers)) {
             const registerConfig = config.registers[<string>register];
@@ -90,6 +95,7 @@ export default class Device {
                 initState[peripheral.name] = peripheral.getCurrentValue()
             }
 
+            peripheral.corespondingPool.on("done", done)
             this.peripherals.push(peripheral)
         }
 
@@ -275,7 +281,6 @@ export default class Device {
      */
     refresh(): boolean {
         const newState: any = {}
-
         for (let peripheral of this.peripherals) {
             if (!peripheral.readable) {
                 continue;
@@ -288,12 +293,13 @@ export default class Device {
         this._discovery?.ping();
         this.resetError()
 
-        return this.update(newState) && this.available;
+        return this._needsPublishState = this.update(newState) && this.available;
     }
 
     sendState() {
         if (this.mqtt.connected && !this.mqtt.disconnecting) {
-            this.mqtt.publish(this._topic(), JSON.stringify(this.state), {retain: this.retain})
+            this._needsPublishState = false;
+            this.mqtt.publish(this._topic(), JSON.stringify(this.state), {retain: this.retain, qos: this.qos})
         }
     }
 

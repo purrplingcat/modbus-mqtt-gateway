@@ -12,7 +12,6 @@ heartbeat:
 devices:
   kitchen-light1: # Světlo v kuchyni
     alias: light
-    checkInterval: 1000
     meta:
       type: device/light, light
       name: Světlo
@@ -47,19 +46,19 @@ devices:
       switch: # Vypínač
         access: RW
         pool: bathroom-sw
-        address: 1
+        field: 1
       switch1: # Vypínač
         access: RW
         pool: bathroom-sw
-        address: 1
+        field: 3
       switch2: # Vypínač
         access: RW
         pool: bathroom-sw
-        address: 1
+        field: 5
       switch3: # Vypínač
         access: RW
         pool: bathroom-sw
-        address: 1
+        field: 4
   #    current: # Měřič proudu světla
   #      access: R
   #      slave: 3
@@ -80,4 +79,4 @@ pools:
   - name: bathroom-sw
     bus: main
     unit: 254
-    length: 3
+    length: 6

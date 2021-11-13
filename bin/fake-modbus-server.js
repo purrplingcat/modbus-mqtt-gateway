@@ -1,16 +1,20 @@
 // create an empty modbus client
+let x = 8000;
 const ModbusRTU = require("modbus-serial");
 const vector = {
     getInputRegister: function(addr, unitID) {
         // Synchronous handling
         return addr;
     },
-    getHoldingRegister: function(addr, unitID, callback) {
+    getMultipleHoldingRegisters: function(addr, length, unitID, callback) {
         // Asynchronous handling (with callback)
-        console.log(`Read ${addr}, unit ${unitID}`);
+        console.log(`Read ${addr} length ${length}, unit ${unitID}`);
         setTimeout(function() {
-            // callback = function(err, value)
-            callback(null, addr + 8000);
+            const r = [];
+            for (let i = 0; i < length; i++) { 
+                r.push(Math.max(0, addr + x + (unitID - i))) 
+            }
+            callback(null, r);
         }, 10);
     },
     getCoil: function(addr, unitID) {
@@ -45,9 +49,11 @@ const vector = {
 
 // set the server to answer for modbus requests
 console.log("ModbusTCP listening on modbus://127.0.0.1:8502");
-var serverTCP = new ModbusRTU.ServerTCP(vector, { host: "127.0.0.1", port: 8502, debug: true, unitID: 1 });
+var serverTCP = new ModbusRTU.ServerTCP(vector, { host: "127.0.0.1", port: 8502, debug: true, unitID: 255 });
 
 serverTCP.on("socketError", function(err){
     // Handle socket error if needed, can be ignored
     console.error(err);
 });
+
+setInterval(() => x = 500 - Math.round(Math.random() * 1000), 10000);

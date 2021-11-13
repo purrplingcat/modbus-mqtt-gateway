@@ -41,12 +41,11 @@ export default class Peripheral {
 
     private _onPoolUpdate(data: number[]) {
         if (data[this.field] == null) {
-            consola.warn(`Peripheral ${this.name}: field ${this.field} in pool ${this.pool} is undefined!`);
+            consola.warn(`Peripheral ${this.device.name}.${this.name}: field ${this.field} in pool ${this.pool} is undefined!`);
             return;
         }
 
         this._value = data[this.field];
-        this.device.refresh();
     }
 
     async read() {

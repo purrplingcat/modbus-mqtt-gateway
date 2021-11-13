@@ -1,5 +1,5 @@
 import { SerialPortOptions, TcpRTUPortOptions } from "modbus-serial/ModbusRTU";
-import { IClientOptions, MqttClient } from "mqtt";
+import { IClientOptions, MqttClient, QoS } from "mqtt";
 import { PoolOptions } from "../devices/pool";
 
 export type ConfigDict<T> = {[key: string]: T} 
@@ -36,6 +36,7 @@ export interface DeviceConfig {
     retain?: boolean;
     registers: ConfigDict<RegistryConfig>
     forceUpdate: boolean;
+    qos: QoS;
 }
 
 export interface DeviceMeta {
