@@ -60,6 +60,8 @@ export interface RegistryConfig {
     pool: string;
     field: number;
     default?: number;
+    format?: "int8" | "uint8" | "int16" | "uint16" | "int32" | "uint32";
+    endian?: "little" | "big";
 }
 
 export interface PoolConfig extends PoolOptions {

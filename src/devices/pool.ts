@@ -88,13 +88,24 @@ export class Pool extends EventEmitter implements PoolOptions {
         }
     }
 
-    async set(field: number, value: number, priority = 0) {
+    async set(field: number, value: number | number[], priority = 0) {
         const opts: RegisterOperationOptions = { priority, timeout: this.writeTimeout, ttl: this.ttl };
+        const values = !Array.isArray(value) ? [value] : value;
+        const promises: Promise<void>[] = [];
 
-        await this._modbus.writeRegister(this.unit, this.offset + field, value, opts);
-        this.data[field] = value;
-        this.emit("update", this.data);
-        process.nextTick(() => this.emit("done", true));
+        for (const [i, val] of values.entries()) {
+            console.log("requuest", i);
+            const write = async () => {
+                await this._modbus.writeRegister(this.unit, this.offset + field + i, val, opts);
+                this.data[field + i] = val;
+                console.log(this.data[field + i])
+            };
+
+            promises.push(write());
+        }
+        
+        await Promise.all(promises);
+        this.refresh();
     }
 
     refresh(priority = 0): Promise<void> {

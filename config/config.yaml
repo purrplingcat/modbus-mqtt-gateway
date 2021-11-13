@@ -28,6 +28,7 @@ devices:
         access: R
         pool: kitchen-sw
         field: 0
+        format: int16
       #brightness: # Jas
       #  access: RW
       #  slave: 2

@@ -1,5 +1,6 @@
 // create an empty modbus client
-let x = 8000;
+let x = 60000;
+let g = {};
 const ModbusRTU = require("modbus-serial");
 const vector = {
     getInputRegister: function(addr, unitID) {
@@ -11,9 +12,14 @@ const vector = {
         console.log(`Read ${addr} length ${length}, unit ${unitID}`);
         setTimeout(function() {
             const r = [];
+            console.log(g);
             for (let i = 0; i < length; i++) { 
-                r.push(Math.max(0, addr + x + (unitID - i))) 
+                if (g[`${unitID}.${addr + i}`] == null) {
+                    g[`${unitID}.${addr + i}`] = Math.max(0, addr + x + (unitID - i))
+                }
+                r.push(g[`${unitID}.${addr + i}`]) 
             }
+            console.log("Output data", r);
             callback(null, r);
         }, 10);
     },
@@ -27,7 +33,9 @@ const vector = {
     },
     setRegister: function(addr, value, unitID) {
         // Asynchronous handling supported also here
-        console.log("set register", addr, value, unitID);
+        console.log("set register", unitID, addr, value);
+        g[`${unitID}.${addr}`] = value;
+        console.log(g);
         return;
     },
     setCoil: function(addr, value, unitID) {
@@ -56,4 +64,8 @@ serverTCP.on("socketError", function(err){
     console.error(err);
 });
 
-setInterval(() => x = 500 - Math.round(Math.random() * 1000), 10000);
+setInterval(() => {
+    g = {}
+    x = Math.round(Math.random() * 10000)
+    console.log("# new base", x);
+}, 30000);

@@ -280,6 +280,7 @@ export default class Device {
      * @returns {Promise<boolean>}
      */
     refresh(): boolean {
+        console.log("in refresh");
         const newState: any = {}
         for (let peripheral of this.peripherals) {
             if (!peripheral.readable) {
@@ -297,6 +298,7 @@ export default class Device {
     }
 
     sendState() {
+        console.log("in send state");
         if (this.mqtt.connected && !this.mqtt.disconnecting) {
             this._needsPublishState = false;
             this.mqtt.publish(this._topic(), JSON.stringify(this.state), {retain: this.retain, qos: this.qos})
