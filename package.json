@@ -13,6 +13,7 @@
     "node": ">=16.0.0"
   },
   "dependencies": {
+    "autobind-decorator": "^2.4.0",
     "consola": "^2.15.3",
     "fast-shallow-equal": "^1.0.0",
     "modbus-serial": "^8.0.1",

@@ -1,7 +1,10 @@
+import autobind from "autobind-decorator";
 import consola, { Consola } from "consola"
 import ModbusRTU from "modbus-serial"
 import { SerialPortOptions, TcpRTUPortOptions } from "modbus-serial/ModbusRTU";
+import { EventEmitter } from "stream";
 import Semaphore from "../mutex/Semaphore";
+import { QueuedInterval } from "../utils/interval";
 
 export type RegisterOperationOptions = {
     priority?: number;
@@ -22,10 +25,33 @@ export class ModbusMaster {
         this.timeout = modbus.getTimeout();
         this._semaphore = new Semaphore(1)
         this._logger = consola.withScope(`modbus:${name}`);
+
+        if (modbus instanceof EventEmitter) {
+            modbus.on("close", this._reconnect);
+        }
+
+        modbus.isOpen ? this._onConnect() : this.modbus.open(this._onConnect);
     }
 
     get connected(): boolean {
         return this.modbus.isOpen
+    }
+
+    @autobind
+    private _reconnect(err?: Error) {
+        if (!this.modbus.isOpen) {
+            this._logger.warn(`Modbus '${this.name}' connection failed:`, err?.message ?? "Connection closed");
+            setTimeout(() => this.modbus.open(this._onConnect), Number(process.env.RECCONECT_TIMEOUT ?? 500));
+        }
+    }
+
+    @autobind
+    private _onConnect(err?: Error) {
+        if (err && !this.connected) { 
+            return this._reconnect(err);
+        }
+
+        this._logger.success(`Modbus '${this.name}' connected!`);
     }
 
     async readRegisters(slave: number, address: number, length: number, options?: RegisterOperationOptions): Promise<number[]> {
