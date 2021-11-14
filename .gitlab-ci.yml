@@ -4,7 +4,7 @@ stages:
   - upload
 
 build:
-  stage: combine
+  stage: build
   tags:
     - linux
   script:
