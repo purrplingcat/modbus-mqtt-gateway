@@ -1,0 +1,38 @@
+stages:
+  - build
+  - package
+  - upload
+
+build:
+  stage: combine
+  tags:
+    - linux
+  script:
+    - yarn
+    - yarn build
+    - mv dist www
+    - yarn build:dist
+  artifacts:
+    paths:
+      - lib/*
+    expire_in: 1 day
+
+build-package:
+  stage: package
+  script:
+    - bash tools/build-app-package.sh
+  tags:
+    - senses
+  artifacts:
+    paths:
+      - dist/*
+    expire_in: 1 week
+
+upload-dist:
+  stage: upload
+  tags:
+    - senses
+  only:
+    - master
+  script:
+    - minc cp dist/modbus-mqtt.sqfs iots3/homeiot/artifacts/modbus-mqtt.sqfs

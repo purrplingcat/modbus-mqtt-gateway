@@ -1,0 +1,11 @@
+{
+    "uid": "purrplingcat.modbus-mqtt",
+    "name": "Modbus MQTT Gateway",
+    "author": "PurrplingCat",
+    "version": "1.0.0",
+    "main": "lib/app.js",
+    "resolve": {
+        "~": [".", "./lib"]
+    },
+    "polyfills": []
+}
