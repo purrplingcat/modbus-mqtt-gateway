@@ -1,0 +1,8 @@
+#! /bin/bash
+
+if [ ! -f ./config.examples/config.yaml ]; then
+    cp ./config.examples/config.yaml ./config/config.yaml
+fi
+
+vim .config/config.yaml
+echo "To apply your configuration changes run 'app restart modbus-mqtt'"

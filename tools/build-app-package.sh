@@ -21,7 +21,7 @@ chmod +x scripts/*
 cd ${STAY}
 
 echo "Creating squashfs image ..."
-mksquashfs -all-root ${WORKDIR}/* ${BUILD_DIR}/${APP_NAME}.sqfs
+mksquashfs ${WORKDIR}/* ${BUILD_DIR}/${APP_NAME}.sqfs -all-root
 
 echo "Publishing distribution files ..."
 mkdir -p ${DIST_DIR}
