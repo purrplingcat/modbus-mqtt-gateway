@@ -10,8 +10,6 @@ build:
   script:
     - yarn
     - yarn build
-    - mv dist www
-    - yarn build:dist
   artifacts:
     paths:
       - lib/*
